@@ -25,6 +25,10 @@
     <string name="simulate_purchase_hint">광고 제거 상태를 시뮬레이션합니다</string>
     <string name="delay_intervention">delay 개입</string>
     <string name="delay_intervention_hint">ON: tick loop 완료 알림을 지연시키고 AlarmManager 개입 경로를 시뮬레이션합니다.</string>
+    <string name="alarm_sound">알람 사운드</string>
+    <string name="alarm_sound_hint">타이머 종료 시 사운드를 재생합니다</string>
+    <string name="alarm_vibration">알람 진동</string>
+    <string name="alarm_vibration_hint">타이머 종료 시 진동을 울립니다</string>
     <string name="quick_timer_ready">퀵 타이머 준비됨</string>
     <string name="tap_to_open">앱을 열려면 탭하세요</string>
     <string name="pause">일시정지</string>

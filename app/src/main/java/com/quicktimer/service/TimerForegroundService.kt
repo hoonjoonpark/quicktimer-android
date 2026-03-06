@@ -101,6 +101,8 @@ class TimerForegroundService : Service() {
     private var lastCompletedSpec: CompletedTimerSpec? = null
     private var scheduledWakeElapsedMs: Long = -1L
     private var delayInterventionEnabled = false
+    private var alarmSoundEnabled = true
+    private var alarmVibrationEnabled = true
     private var quickNotificationDirty = true
     private lateinit var logStore: LogStore
     private lateinit var runningTimerStore: RunningTimerStore
@@ -132,6 +134,20 @@ class TimerForegroundService : Service() {
                 if (delayInterventionEnabled != settings.delayIntervention) {
                     delayInterventionEnabled = settings.delayIntervention
                     logEvent("SETTING delay_intervention=$delayInterventionEnabled")
+                }
+                if (alarmSoundEnabled != settings.alarmSoundEnabled) {
+                    alarmSoundEnabled = settings.alarmSoundEnabled
+                    logEvent("SETTING alarm_sound=$alarmSoundEnabled")
+                    if (!alarmSoundEnabled && completionAlertActive) {
+                        runCatching { completionRingtone?.stop() }
+                    }
+                }
+                if (alarmVibrationEnabled != settings.alarmVibrationEnabled) {
+                    alarmVibrationEnabled = settings.alarmVibrationEnabled
+                    logEvent("SETTING alarm_vibration=$alarmVibrationEnabled")
+                    if (!alarmVibrationEnabled && completionAlertActive) {
+                        runCatching { completionVibrator?.cancel() }
+                    }
                 }
             }
         }
@@ -894,31 +910,35 @@ class TimerForegroundService : Service() {
             "${displayLabel(spec.durationSeconds, spec.label)} (${formatDuration(spec.durationSeconds)})"
         } ?: "unknown"
         logEvent("ALARM_RING[${trigger.tag}] start $summary")
-        if (completionRingtone == null) {
-            val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-            completionRingtone = RingtoneManager.getRingtone(this, uri)?.apply {
-                isLooping = true
-                audioAttributes = AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ALARM)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .build()
+        if (alarmSoundEnabled) {
+            if (completionRingtone == null) {
+                val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                    ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                completionRingtone = RingtoneManager.getRingtone(this, uri)?.apply {
+                    isLooping = true
+                    audioAttributes = AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                }
             }
+            runCatching { completionRingtone?.play() }
         }
-        runCatching { completionRingtone?.play() }
 
-        if (completionVibrator == null) {
-            completionVibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val manager = getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager
-                manager.defaultVibrator
-            } else {
-                @Suppress("DEPRECATION")
-                getSystemService(VIBRATOR_SERVICE) as Vibrator
+        if (alarmVibrationEnabled) {
+            if (completionVibrator == null) {
+                completionVibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    val manager = getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager
+                    manager.defaultVibrator
+                } else {
+                    @Suppress("DEPRECATION")
+                    getSystemService(VIBRATOR_SERVICE) as Vibrator
+                }
             }
-        }
-        val pattern = longArrayOf(0, 400, 250, 400)
-        runCatching {
-            completionVibrator?.vibrate(VibrationEffect.createWaveform(pattern, 0))
+            val pattern = longArrayOf(0, 400, 250, 400)
+            runCatching {
+                completionVibrator?.vibrate(VibrationEffect.createWaveform(pattern, 0))
+            }
         }
     }
 

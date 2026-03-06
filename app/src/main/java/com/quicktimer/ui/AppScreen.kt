@@ -321,6 +321,8 @@ fun QuickTimerApp(
                     onFontSize = viewModel::setFontSize,
                     onAdsRemoved = viewModel::setAdsRemoved,
                     onDelayIntervention = viewModel::setDelayIntervention,
+                    onAlarmSoundEnabled = viewModel::setAlarmSoundEnabled,
+                    onAlarmVibrationEnabled = viewModel::setAlarmVibrationEnabled,
                     onOpenLogs = { showLogs = true },
                     fontScale = fontScale
                 )
@@ -1167,6 +1169,8 @@ private fun SettingsTab(
     onFontSize: (FontSize) -> Unit,
     onAdsRemoved: (Boolean) -> Unit,
     onDelayIntervention: (Boolean) -> Unit,
+    onAlarmSoundEnabled: (Boolean) -> Unit,
+    onAlarmVibrationEnabled: (Boolean) -> Unit,
     onOpenLogs: () -> Unit,
     fontScale: Float
 ) {
@@ -1249,6 +1253,56 @@ private fun SettingsTab(
                 Switch(
                     checked = state.settings.delayIntervention,
                     onCheckedChange = onDelayIntervention
+                )
+            }
+        }
+
+        item {
+            HorizontalDivider()
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.alarm_sound),
+                        fontSize = (18 * fontScale).sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        stringResource(R.string.alarm_sound_hint),
+                        fontSize = (13 * fontScale).sp
+                    )
+                }
+                Switch(
+                    checked = state.settings.alarmSoundEnabled,
+                    onCheckedChange = onAlarmSoundEnabled
+                )
+            }
+        }
+
+        item {
+            HorizontalDivider()
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.alarm_vibration),
+                        fontSize = (18 * fontScale).sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        stringResource(R.string.alarm_vibration_hint),
+                        fontSize = (13 * fontScale).sp
+                    )
+                }
+                Switch(
+                    checked = state.settings.alarmVibrationEnabled,
+                    onCheckedChange = onAlarmVibrationEnabled
                 )
             }
         }

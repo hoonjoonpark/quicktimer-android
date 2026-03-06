@@ -149,6 +149,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { app.settingsStore.setDelayIntervention(enabled) }
     }
 
+    fun setAlarmSoundEnabled(enabled: Boolean) {
+        viewModelScope.launch { app.settingsStore.setAlarmSoundEnabled(enabled) }
+    }
+
+    fun setAlarmVibrationEnabled(enabled: Boolean) {
+        viewModelScope.launch { app.settingsStore.setAlarmVibrationEnabled(enabled) }
+    }
+
     fun logEvent(message: String) {
         app.logStore.append(message)
     }

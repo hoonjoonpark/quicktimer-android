@@ -40,7 +40,9 @@ data class AppSettings(
     val languageTag: String = "system",
     val fontSize: FontSize = FontSize.NORMAL,
     val adsRemoved: Boolean = false,
-    val delayIntervention: Boolean = false
+    val delayIntervention: Boolean = false,
+    val alarmSoundEnabled: Boolean = true,
+    val alarmVibrationEnabled: Boolean = true
 )
 
 fun defaultPresets(): List<TimerPreset> {
