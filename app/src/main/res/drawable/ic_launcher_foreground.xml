@@ -6,6 +6,7 @@
     <group
         android:pivotX="54"
         android:pivotY="54"
+        android:translateX="0.4"
         android:scaleX="0.62"
         android:scaleY="0.62">
         <path

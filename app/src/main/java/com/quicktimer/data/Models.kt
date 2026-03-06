@@ -49,7 +49,8 @@ fun defaultPresets(): List<TimerPreset> {
     return listOf(
         TimerPreset(id = 1L, durationSeconds = 8 * 60, label = "파스타"),
         TimerPreset(id = 2L, durationSeconds = 10 * 60, label = "계란삶기"),
-        TimerPreset(id = 3L, durationSeconds = 15 * 60, label = "낮잠")
+        TimerPreset(id = 3L, durationSeconds = 15 * 60, label = "낮잠"),
+        TimerPreset(id = 4L, durationSeconds = 50 * 60, label = "집중")
     )
 }
 

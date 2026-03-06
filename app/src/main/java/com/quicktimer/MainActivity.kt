@@ -36,7 +36,12 @@ class MainActivity : ComponentActivity() {
     private var runningTabNavigationRequest: RunningTabNavigationRequest? by mutableStateOf(null)
 
     private val requestPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                viewModel.ensureService()
+                TimerServiceController.refreshQuickActions(this)
+            }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,6 +53,7 @@ class MainActivity : ComponentActivity() {
 
         maybeRequestNotificationPermission()
         viewModel.ensureService()
+        TimerServiceController.refreshQuickActions(this)
         handleNotificationEntry(intent)
 
         setContent {
@@ -91,12 +97,12 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleNotificationEntry(intent: Intent?) {
-        val fromAlarm = intent?.getBooleanExtra("from_alarm", false) == true
+        val fromAlarm = intent?.getBooleanExtra(EXTRA_FROM_ALARM, false) == true
         val fromRunningNotification = intent?.getBooleanExtra(EXTRA_FROM_RUNNING_NOTIFICATION, false) == true
-        val fromNotification = intent?.getBooleanExtra("from_notification", false) == true
+        val fromNotification = intent?.getBooleanExtra(EXTRA_FROM_NOTIFICATION, false) == true
         if (fromAlarm) {
             TimerServiceController.acknowledgeAlarm(this)
-            intent?.removeExtra("from_alarm")
+            intent?.removeExtra(EXTRA_FROM_ALARM)
         }
         if (fromRunningNotification) {
             val targetTimerId = intent?.getIntExtra(EXTRA_TARGET_TIMER_ID, 0) ?: 0
@@ -106,11 +112,11 @@ class MainActivity : ComponentActivity() {
             )
             intent?.removeExtra(EXTRA_FROM_RUNNING_NOTIFICATION)
             intent?.removeExtra(EXTRA_TARGET_TIMER_ID)
-            intent?.removeExtra("from_notification")
+            intent?.removeExtra(EXTRA_FROM_NOTIFICATION)
             return
         }
         if (!fromNotification) return
-        intent?.removeExtra("from_notification")
+        intent?.removeExtra(EXTRA_FROM_NOTIFICATION)
         showInterstitialAd()
     }
 
@@ -138,6 +144,8 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
+        const val EXTRA_FROM_NOTIFICATION = "from_notification"
+        const val EXTRA_FROM_ALARM = "from_alarm"
         const val EXTRA_FROM_RUNNING_NOTIFICATION = "from_running_notification"
         const val EXTRA_TARGET_TIMER_ID = "target_timer_id"
     }

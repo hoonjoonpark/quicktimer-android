@@ -708,7 +708,7 @@ private fun HistoryRow(
             modifier = Modifier
                 .matchParentSize()
                 .background(
-                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f * revealProgress),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = revealProgress),
                     shape = RoundedCornerShape(12.dp)
                 ),
             horizontalArrangement = Arrangement.End,
@@ -724,7 +724,7 @@ private fun HistoryRow(
                 Icon(
                     imageVector = Icons.Default.Delete,
                     contentDescription = stringResource(R.string.delete),
-                    tint = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = revealProgress)
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = revealProgress)
                 )
             }
         }

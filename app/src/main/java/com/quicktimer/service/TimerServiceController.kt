@@ -78,6 +78,7 @@ object TimerServiceController {
 
     fun acknowledgeAlarm(context: Context) {
         val intent = Intent(context, TimerForegroundService::class.java).setAction(ACTION_ACK_ALARM)
-        context.startForegroundService(intent)
+        runCatching { context.startService(intent) }
+            .onFailure { context.startForegroundService(intent) }
     }
 }

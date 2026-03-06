@@ -154,6 +154,12 @@ class TimerForegroundService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == TimerServiceController.ACTION_ACK_ALARM) {
+            acknowledgeCompletionAlert()
+            return START_STICKY
+        }
+
+        ensureForegroundNotification()
         serviceScope.launch {
             awaitRestore()
             when (intent?.action) {
@@ -209,7 +215,6 @@ class TimerForegroundService : Service() {
                     syncNotifications()
                 }
 
-                TimerServiceController.ACTION_ACK_ALARM -> acknowledgeCompletionAlert()
                 TimerServiceController.ACTION_EXACT_WAKE -> onExactWake(intent)
                 else -> syncNotifications()
             }
@@ -707,9 +712,11 @@ class TimerForegroundService : Service() {
     }
 
     private fun syncNotifications(completed: Boolean = false) {
+        if (!quickNotificationDirty && !isNotificationActive(QUICK_NOTIFICATION_ID)) {
+            quickNotificationDirty = true
+        }
         if (quickNotificationDirty || completed) {
-            updateQuickNotification(completed)
-            quickNotificationDirty = false
+            quickNotificationDirty = !updateQuickNotification(completed)
         }
         if (timers.isNotEmpty()) {
             updateRunningNotification()
@@ -724,8 +731,25 @@ class TimerForegroundService : Service() {
         scheduleExactWake()
     }
 
-    private fun updateQuickNotification(completed: Boolean = false) {
-        notifySafely(
+    private fun ensureForegroundNotification() {
+        val notification = buildQuickNotification()
+        runCatching {
+            startForeground(QUICK_NOTIFICATION_ID, notification)
+            true
+        }.onFailure {
+            logEvent("FOREGROUND_ENSURE_FAIL ${it::class.java.simpleName}")
+        }
+    }
+
+    private fun isNotificationActive(notificationId: Int): Boolean {
+        val manager = ContextCompat.getSystemService(this, NotificationManager::class.java) ?: return false
+        return runCatching {
+            manager.activeNotifications.any { it.id == notificationId }
+        }.getOrDefault(false)
+    }
+
+    private fun updateQuickNotification(completed: Boolean = false): Boolean {
+        return notifySafely(
             QUICK_NOTIFICATION_ID,
             buildQuickNotification(completed)
         )
@@ -747,13 +771,14 @@ class TimerForegroundService : Service() {
     }
 
     @SuppressLint("MissingPermission")
-    private fun notifySafely(notificationId: Int, notification: Notification) {
-        if (!hasNotificationPermission()) return
-        runCatching {
+    private fun notifySafely(notificationId: Int, notification: Notification): Boolean {
+        if (!hasNotificationPermission()) return false
+        return runCatching {
             NotificationManagerCompat.from(this).notify(notificationId, notification)
+            true
         }.onFailure {
             logEvent("NOTIFY_FAIL id=$notificationId ${it::class.java.simpleName}")
-        }
+        }.getOrDefault(false)
     }
 
     private fun hasNotificationPermission(): Boolean {
@@ -768,7 +793,7 @@ class TimerForegroundService : Service() {
         val openIntent = PendingIntent.getActivity(
             this,
             1,
-            Intent(this, MainActivity::class.java).putExtra("from_notification", true),
+            Intent(this, MainActivity::class.java).putExtra(MainActivity.EXTRA_FROM_NOTIFICATION, true),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
@@ -776,7 +801,7 @@ class TimerForegroundService : Service() {
             .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(openIntent)
             .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOnlyAlertOnce(true)
             .setSilent(true)
             .setContentTitle(
@@ -868,8 +893,8 @@ class TimerForegroundService : Service() {
             this,
             9,
             Intent(this, MainActivity::class.java)
-                .putExtra("from_alarm", true)
-                .putExtra("from_notification", true),
+                .putExtra(MainActivity.EXTRA_FROM_ALARM, true)
+                .putExtra(MainActivity.EXTRA_FROM_NOTIFICATION, true),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         val builder = NotificationCompat.Builder(this, COMPLETION_CHANNEL_ID)
@@ -1008,7 +1033,7 @@ class TimerForegroundService : Service() {
         val quickChannel = NotificationChannel(
             QUICK_CHANNEL_ID,
             "Quick timer",
-            NotificationManager.IMPORTANCE_MIN
+            NotificationManager.IMPORTANCE_LOW
         )
         quickChannel.description = "Quick action buttons"
         quickChannel.enableVibration(false)
