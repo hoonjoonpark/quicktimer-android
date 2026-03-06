@@ -793,7 +793,7 @@ class TimerForegroundService : Service() {
         val openIntent = PendingIntent.getActivity(
             this,
             1,
-            Intent(this, MainActivity::class.java).putExtra(MainActivity.EXTRA_FROM_NOTIFICATION, true),
+            Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
