@@ -11,6 +11,7 @@ data class ActiveTimerState(
     val label: String = "",
     val isPrimary: Boolean = false,
     val isPaused: Boolean = false,
+    val updatedAtElapsedMs: Long = 0L,
     val laps: List<String> = emptyList()
 )
 
@@ -21,7 +22,10 @@ data class RunningTimerState(
     val isPaused: Boolean = false,
     val laps: List<String> = emptyList(),
     val activeTimers: List<ActiveTimerState> = emptyList(),
-    val isAlarmRinging: Boolean = false
+    val isAlarmRinging: Boolean = false,
+    val elapsedRealtimeMs: Long = 0L,
+    val scheduledWakeElapsedMs: Long = -1L,
+    val exactAlarmAllowed: Boolean = true
 )
 
 object TimerRuntimeState {

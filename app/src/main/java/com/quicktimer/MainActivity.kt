@@ -14,6 +14,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
@@ -29,6 +30,8 @@ import com.quicktimer.ui.QuickTimerApp
 import com.quicktimer.ui.RunningTabNavigationRequest
 import com.quicktimer.ui.theme.QuickTimerTheme
 import com.quicktimer.service.TimerServiceController
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private val viewModel: AppViewModel by viewModels()
@@ -103,6 +106,11 @@ class MainActivity : ComponentActivity() {
         if (fromAlarm) {
             TimerServiceController.acknowledgeAlarm(this)
             intent?.removeExtra(EXTRA_FROM_ALARM)
+            if (fromNotification) {
+                intent?.removeExtra(EXTRA_FROM_NOTIFICATION)
+                maybeShowInterstitialAd()
+            }
+            return
         }
         if (fromRunningNotification) {
             val targetTimerId = intent?.getIntExtra(EXTRA_TARGET_TIMER_ID, 0) ?: 0
@@ -117,7 +125,17 @@ class MainActivity : ComponentActivity() {
         }
         if (!fromNotification) return
         intent?.removeExtra(EXTRA_FROM_NOTIFICATION)
-        showInterstitialAd()
+        maybeShowInterstitialAd()
+    }
+
+    private fun maybeShowInterstitialAd() {
+        lifecycleScope.launch {
+            val adsRemoved = runCatching {
+                (application as QuickTimerApplication).settingsStore.settingsFlow.first().adsRemoved
+            }.getOrDefault(false)
+            if (adsRemoved) return@launch
+            showInterstitialAd()
+        }
     }
 
     private fun showInterstitialAd() {

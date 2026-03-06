@@ -2,5 +2,6 @@
 <resources>
     <style name="Theme.QuickTimer" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="android:windowBackground">@color/app_background_dark</item>
+        <item name="android:windowSplashScreenBackground">@color/app_background_dark</item>
     </style>
 </resources>

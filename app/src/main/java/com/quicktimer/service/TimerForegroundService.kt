@@ -155,7 +155,10 @@ class TimerForegroundService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == TimerServiceController.ACTION_ACK_ALARM) {
-            acknowledgeCompletionAlert()
+            ensureForegroundNotification()
+            serviceScope.launch {
+                acknowledgeCompletionAlert()
+            }
             return START_STICKY
         }
 
@@ -594,16 +597,52 @@ class TimerForegroundService : Service() {
         return if (timerId == 0) timers.firstOrNull()?.id else timerId
     }
 
+    private fun expectedWakeElapsedMs(timer: TimerEntry): Long {
+        return if (timer.deferredByDelayMode && timer.deferredWakeElapsedMs > 0L) {
+            timer.deferredWakeElapsedMs
+        } else {
+            timer.updatedAtElapsedMs + timer.remainingMillis
+        }
+    }
+
+    private fun selectSoonestTimer(): TimerEntry? {
+        val runningTimer = timers.asSequence()
+            .filter { !it.isPaused }
+            .minWithOrNull(
+                compareBy<TimerEntry> { expectedWakeElapsedMs(it) }
+                    .thenBy { it.id }
+            )
+        if (runningTimer != null) return runningTimer
+        return timers.minWithOrNull(compareBy<TimerEntry> { it.remainingMillis }.thenBy { it.id })
+    }
+
+    private fun completionNotificationTitle(spec: CompletedTimerSpec?): String {
+        if (spec == null || spec.durationSeconds <= 0) return getString(R.string.running_timer)
+        val durationLabel = formatDuration(spec.durationSeconds)
+        return if (spec.label.isBlank()) {
+            durationLabel
+        } else {
+            "${spec.label} ($durationLabel)"
+        }
+    }
+
     private fun publishState() {
-        val primary = timers.firstOrNull()
-        val active = timers.mapIndexed { index, timer ->
+        val nowElapsed = SystemClock.elapsedRealtime()
+        val exactAlarmAllowed = runCatching {
+            val alarmManager = getSystemService(ALARM_SERVICE) as AlarmManager
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
+        }.getOrDefault(true)
+        val primary = selectSoonestTimer()
+        val primaryId = primary?.id
+        val active = timers.map { timer ->
             ActiveTimerState(
                 id = timer.id,
                 totalMillis = timer.totalMillis,
                 remainingMillis = timer.remainingMillis,
                 label = timer.label,
-                isPrimary = index == 0,
+                isPrimary = timer.id == primaryId,
                 isPaused = timer.isPaused,
+                updatedAtElapsedMs = timer.updatedAtElapsedMs,
                 laps = timer.laps.toList()
             )
         }
@@ -615,7 +654,10 @@ class TimerForegroundService : Service() {
                 isPaused = primary?.isPaused == true,
                 laps = primary?.laps?.toList().orEmpty(),
                 activeTimers = active,
-                isAlarmRinging = completionAlertActive
+                isAlarmRinging = completionAlertActive,
+                elapsedRealtimeMs = nowElapsed,
+                scheduledWakeElapsedMs = scheduledWakeElapsedMs,
+                exactAlarmAllowed = exactAlarmAllowed
             )
         )
     }
@@ -642,13 +684,7 @@ class TimerForegroundService : Service() {
         val nextWakeElapsed = timers
             .asSequence()
             .filter { !it.isPaused }
-            .map { timer ->
-                if (timer.deferredByDelayMode && timer.deferredWakeElapsedMs > 0L) {
-                    timer.deferredWakeElapsedMs
-                } else {
-                    timer.updatedAtElapsedMs + timer.remainingMillis
-                }
-            }
+            .map { timer -> expectedWakeElapsedMs(timer) }
             .minOrNull()
 
         if (nextWakeElapsed == null) {
@@ -689,6 +725,7 @@ class TimerForegroundService : Service() {
         scheduledWakeElapsedMs = nextWakeElapsed
         val remainingMs = (nextWakeElapsed - SystemClock.elapsedRealtime()).coerceAtLeast(0L)
         logEvent("ALARM_SCHEDULE[$mode] in=${remainingMs}ms atElapsed=$nextWakeElapsed")
+        publishState()
     }
 
     private fun cancelExactWake() {
@@ -697,6 +734,7 @@ class TimerForegroundService : Service() {
         logEvent("ALARM_CANCEL elapsed=$scheduledWakeElapsedMs")
         alarmManager.cancel(exactWakePendingIntent(scheduledWakeElapsedMs))
         scheduledWakeElapsedMs = -1L
+        publishState()
     }
 
     private fun exactWakePendingIntent(expectedElapsedMs: Long): PendingIntent {
@@ -793,7 +831,7 @@ class TimerForegroundService : Service() {
         val openIntent = PendingIntent.getActivity(
             this,
             1,
-            Intent(this, MainActivity::class.java),
+            mainActivityIntent(),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
@@ -830,11 +868,11 @@ class TimerForegroundService : Service() {
     }
 
     private fun buildRunningNotification(): Notification {
-        val primary = timers.firstOrNull() ?: return buildQuickNotification()
+        val primary = selectSoonestTimer() ?: return buildQuickNotification()
         val openIntent = PendingIntent.getActivity(
             this,
             2,
-            Intent(this, MainActivity::class.java)
+            mainActivityIntent()
                 .putExtra(MainActivity.EXTRA_FROM_RUNNING_NOTIFICATION, true)
                 .putExtra(MainActivity.EXTRA_TARGET_TIMER_ID, primary.id),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
@@ -892,7 +930,7 @@ class TimerForegroundService : Service() {
         val openIntent = PendingIntent.getActivity(
             this,
             9,
-            Intent(this, MainActivity::class.java)
+            mainActivityIntent()
                 .putExtra(MainActivity.EXTRA_FROM_ALARM, true)
                 .putExtra(MainActivity.EXTRA_FROM_NOTIFICATION, true),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
@@ -900,7 +938,7 @@ class TimerForegroundService : Service() {
         val builder = NotificationCompat.Builder(this, COMPLETION_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(openIntent)
-            .setContentTitle(getString(R.string.running_timer))
+            .setContentTitle(completionNotificationTitle(lastCompletedSpec))
             .setContentText(getString(R.string.tap_to_stop_alarm))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
@@ -1018,6 +1056,12 @@ class TimerForegroundService : Service() {
             intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
+    }
+
+    private fun mainActivityIntent(): Intent {
+        return Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
     }
 
     private fun clearStaleNotifications() {

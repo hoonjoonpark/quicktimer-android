@@ -1,14 +1,14 @@
 {
   "palette": {
     "neutral": {
-      "bg": "#060606",
-      "surface": "#2B2B2D",
-      "surfaceAlt": "#403F49",
-      "surfaceVariant": "#565659",
-      "outline": "#9A9A9B",
-      "textPrimary": "#E3E5F0",
-      "textSecondary": "#9A9A9B",
-      "textDisabled": "#5C5C5D"
+      "bg": "#050506",
+      "surface": "#15161A",
+      "surfaceAlt": "#1E2026",
+      "surfaceVariant": "#252730",
+      "outline": "#767B8B",
+      "textPrimary": "#E8EAF2",
+      "textSecondary": "#B6B9C6",
+      "textDisabled": "#6A6F80"
     },
     "brand": {
       "primary": "#605FE4",
@@ -22,13 +22,13 @@
   },
 
   "semantic": {
-    "background": "#060606",
-    "onBackground": "#E3E5F0",
+    "background": "#050506",
+    "onBackground": "#E8EAF2",
 
-    "surface": "#2B2B2D",
-    "onSurface": "#E3E5F0",
-    "surfaceVariant": "#403F49",
-    "onSurfaceVariant": "#9A9A9B",
+    "surface": "#15161A",
+    "onSurface": "#E8EAF2",
+    "surfaceVariant": "#252730",
+    "onSurfaceVariant": "#B6B9C6",
 
     "primary": "#605FE4",
     "onPrimary": "#FFFFFF",
@@ -38,12 +38,12 @@
     "secondary": "#5C5BA3",
     "onSecondary": "#FFFFFF",
 
-    "outline": "#403F49",
-    "divider": "#403F49",
+    "outline": "#767B8B",
+    "divider": "#767B8B",
 
     "disabled": {
-      "content": "#5C5C5D",
-      "container": "#2B2B2D",
+      "content": "#6A6F80",
+      "container": "#15161A",
       "opacity": 0.38
     }
   }

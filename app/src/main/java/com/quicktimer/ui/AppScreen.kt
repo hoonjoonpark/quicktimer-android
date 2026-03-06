@@ -1,6 +1,8 @@
 package com.quicktimer.ui
 
 import android.content.Intent
+import android.os.Build
+import android.util.TypedValue
 import android.view.ViewGroup
 import android.widget.NumberPicker
 import android.widget.Toast
@@ -38,6 +40,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Scaffold
@@ -48,6 +51,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.getValue
@@ -87,6 +91,7 @@ import com.quicktimer.data.TimerPreset
 import com.quicktimer.data.displayLabel
 import com.quicktimer.data.formatDuration
 import com.quicktimer.data.formatDurationMillis
+import com.quicktimer.service.ActiveTimerState
 import com.quicktimer.service.RunningTimerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -118,6 +123,7 @@ fun QuickTimerApp(
     val context = LocalContext.current
     var tab by remember { mutableStateOf(MainTab.TIMERS) }
     var showLogs by remember { mutableStateOf(false) }
+    var showRuntimeDebug by remember { mutableStateOf(false) }
     var showAddDialog by remember { mutableStateOf(false) }
     var editingPreset by remember { mutableStateOf<TimerPreset?>(null) }
     var showClearHistoryDialog by remember { mutableStateOf(false) }
@@ -139,19 +145,42 @@ fun QuickTimerApp(
         FontSize.NORMAL -> 1f
         FontSize.LARGE -> 1.15f
     }
+    val navigationItemColors = NavigationBarItemDefaults.colors(
+        selectedIconColor = MaterialTheme.colorScheme.onSurface,
+        selectedTextColor = MaterialTheme.colorScheme.onSurface,
+        indicatorColor = MaterialTheme.colorScheme.surface,
+        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+    )
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onBackground,
+                    actionIconContentColor = MaterialTheme.colorScheme.onBackground
+                ),
                 title = {
                     Text(
-                        text = if (showLogs) stringResource(R.string.logs_title) else stringResource(R.string.app_name),
+                        text = when {
+                            showLogs -> stringResource(R.string.logs_title)
+                            showRuntimeDebug -> stringResource(R.string.runtime_debug_title)
+                            else -> stringResource(R.string.app_name)
+                        },
                         fontSize = (20 * fontScale).sp
                     )
                 },
                 navigationIcon = {
-                    if (showLogs) {
-                        IconButton(onClick = { showLogs = false }) {
+                    if (showLogs || showRuntimeDebug) {
+                        IconButton(
+                            onClick = {
+                                showLogs = false
+                                showRuntimeDebug = false
+                            }
+                        ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = stringResource(R.string.back)
@@ -160,7 +189,7 @@ fun QuickTimerApp(
                     }
                 },
                 actions = {
-                    if (!showLogs) {
+                    if (!showLogs && !showRuntimeDebug) {
                         when (tab) {
                             MainTab.TIMERS -> {
                                 IconButton(onClick = { showAddDialog = true }) {
@@ -188,7 +217,7 @@ fun QuickTimerApp(
             )
         },
         bottomBar = {
-            if (!showLogs) {
+            if (!showLogs && !showRuntimeDebug) {
                 Column {
                     if (isAlarmRinging) {
                         Button(
@@ -203,10 +232,14 @@ fun QuickTimerApp(
                     if (!uiState.settings.adsRemoved) {
                         AdBanner()
                     }
-                    NavigationBar {
+                    NavigationBar(
+                        containerColor = MaterialTheme.colorScheme.background,
+                        tonalElevation = 0.dp
+                    ) {
                         NavigationBarItem(
                             selected = tab == MainTab.TIMERS,
                             onClick = { tab = MainTab.TIMERS },
+                            colors = navigationItemColors,
                             icon = {
                                 Icon(
                                     painter = painterResource(id = R.drawable.ic_tab_timer),
@@ -219,6 +252,7 @@ fun QuickTimerApp(
                         NavigationBarItem(
                             selected = tab == MainTab.RUNNING,
                             onClick = { tab = MainTab.RUNNING },
+                            colors = navigationItemColors,
                             icon = {
                                 BadgedBox(
                                     badge = {
@@ -241,6 +275,7 @@ fun QuickTimerApp(
                         NavigationBarItem(
                             selected = tab == MainTab.HISTORY,
                             onClick = { tab = MainTab.HISTORY },
+                            colors = navigationItemColors,
                             icon = {
                                 Icon(
                                     painter = painterResource(id = R.drawable.ic_tab_history),
@@ -253,6 +288,7 @@ fun QuickTimerApp(
                         NavigationBarItem(
                             selected = tab == MainTab.SETTINGS,
                             onClick = { tab = MainTab.SETTINGS },
+                            colors = navigationItemColors,
                             icon = {
                                 Icon(
                                     imageVector = Icons.Filled.Settings,
@@ -272,6 +308,12 @@ fun QuickTimerApp(
                 logs = uiState.logs,
                 onExport = { exportLogs(context, uiState.logs) },
                 onClear = viewModel::clearLogs,
+                fontScale = fontScale
+            )
+        } else if (showRuntimeDebug) {
+            RuntimeDebugScreen(
+                modifier = Modifier.padding(padding),
+                runningTimer = uiState.runningTimer,
                 fontScale = fontScale
             )
         } else {
@@ -324,6 +366,7 @@ fun QuickTimerApp(
                     onAlarmSoundEnabled = viewModel::setAlarmSoundEnabled,
                     onAlarmVibrationEnabled = viewModel::setAlarmVibrationEnabled,
                     onOpenLogs = { showLogs = true },
+                    onOpenRuntimeDebug = { showRuntimeDebug = true },
                     fontScale = fontScale
                 )
             }
@@ -422,7 +465,7 @@ private fun TimerTab(
         Box(
             modifier = modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.surface)
+                .background(MaterialTheme.colorScheme.background)
                 .padding(horizontal = 16.dp, vertical = 24.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -448,7 +491,7 @@ private fun TimerTab(
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface)
+            .background(MaterialTheme.colorScheme.background)
             .padding(start = 16.dp, end = 16.dp, top = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 16.dp)
@@ -526,7 +569,8 @@ private fun RunningTab(
 ) {
     val listState = rememberLazyListState()
     var flashingTimerId by remember { mutableStateOf<Int?>(null) }
-    val runningIds = runningTimer.activeTimers.map { it.id }
+    val sortedActiveTimers = sortedByExpectedFinish(runningTimer.activeTimers)
+    val runningIds = sortedActiveTimers.map { it.id }
 
     LaunchedEffect(highlightRequestId, runningIds) {
         val requestId = highlightRequestId ?: return@LaunchedEffect
@@ -545,11 +589,11 @@ private fun RunningTab(
         flashingTimerId = null
     }
 
-    if (runningTimer.activeTimers.isEmpty()) {
+    if (sortedActiveTimers.isEmpty()) {
         Box(
             modifier = modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.surface),
+                .background(MaterialTheme.colorScheme.background),
             contentAlignment = Alignment.Center
         ) {
             Text(stringResource(R.string.no_running_timers), fontSize = (16 * fontScale).sp)
@@ -561,23 +605,29 @@ private fun RunningTab(
         state = listState,
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface)
+            .background(MaterialTheme.colorScheme.background)
             .padding(start = 16.dp, end = 16.dp, top = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 16.dp)
     ) {
-        itemsIndexed(runningTimer.activeTimers, key = { _, timer -> "running-${timer.id}" }) { _, active ->
+        itemsIndexed(sortedActiveTimers, key = { _, timer -> "running-${timer.id}" }) { _, active ->
             val isHighlighted = active.id == flashingTimerId
             val cardModifier = Modifier.fillMaxWidth()
+            val durationLabel = formatDuration((active.totalMillis / 1000L).toInt())
+            val titleLabel = if (active.label.isBlank()) {
+                durationLabel
+            } else {
+                "${active.label} ($durationLabel)"
+            }
             if (isHighlighted) {
                 Card(
                     modifier = cardModifier,
+                    shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
                     )
                 ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        val titleLabel = displayLabel((active.totalMillis / 1000L).toInt(), active.label)
                         Text(
                             text = titleLabel,
                             fontSize = (18 * fontScale).sp,
@@ -588,17 +638,29 @@ private fun RunningTab(
                             fontSize = (30 * fontScale).sp,
                             fontWeight = FontWeight.ExtraBold
                         )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(onClick = { onLap(active.id) }) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = { onLap(active.id) },
+                                modifier = Modifier.weight(1f)
+                            ) {
                                 Text(stringResource(R.string.lap), fontSize = (14 * fontScale).sp)
                             }
-                            Button(onClick = { if (active.isPaused) onResume(active.id) else onPause(active.id) }) {
+                            Button(
+                                onClick = { if (active.isPaused) onResume(active.id) else onPause(active.id) },
+                                modifier = Modifier.weight(1f)
+                            ) {
                                 Text(
                                     if (active.isPaused) stringResource(R.string.resume) else stringResource(R.string.pause),
                                     fontSize = (14 * fontScale).sp
                                 )
                             }
-                            Button(onClick = { onStop(active.id) }) {
+                            Button(
+                                onClick = { onStop(active.id) },
+                                modifier = Modifier.weight(1f)
+                            ) {
                                 Text(stringResource(R.string.stop), fontSize = (14 * fontScale).sp)
                             }
                         }
@@ -613,10 +675,13 @@ private fun RunningTab(
                 }
             } else {
                 Card(
-                    modifier = cardModifier
+                    modifier = cardModifier,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
                 ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        val titleLabel = displayLabel((active.totalMillis / 1000L).toInt(), active.label)
                         Text(
                             text = titleLabel,
                             fontSize = (18 * fontScale).sp,
@@ -627,17 +692,29 @@ private fun RunningTab(
                             fontSize = (30 * fontScale).sp,
                             fontWeight = FontWeight.ExtraBold
                         )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(onClick = { onLap(active.id) }) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = { onLap(active.id) },
+                                modifier = Modifier.weight(1f)
+                            ) {
                                 Text(stringResource(R.string.lap), fontSize = (14 * fontScale).sp)
                             }
-                            Button(onClick = { if (active.isPaused) onResume(active.id) else onPause(active.id) }) {
+                            Button(
+                                onClick = { if (active.isPaused) onResume(active.id) else onPause(active.id) },
+                                modifier = Modifier.weight(1f)
+                            ) {
                                 Text(
                                     if (active.isPaused) stringResource(R.string.resume) else stringResource(R.string.pause),
                                     fontSize = (14 * fontScale).sp
                                 )
                             }
-                            Button(onClick = { onStop(active.id) }) {
+                            Button(
+                                onClick = { onStop(active.id) },
+                                modifier = Modifier.weight(1f)
+                            ) {
                                 Text(stringResource(R.string.stop), fontSize = (14 * fontScale).sp)
                             }
                         }
@@ -666,7 +743,7 @@ private fun HistoryTab(
         Box(
             modifier = modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.surface),
+                .background(MaterialTheme.colorScheme.background),
             contentAlignment = Alignment.Center
         ) {
             Text(stringResource(R.string.no_history), fontSize = (16 * fontScale).sp)
@@ -677,7 +754,7 @@ private fun HistoryTab(
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface)
+            .background(MaterialTheme.colorScheme.background)
             .padding(start = 16.dp, end = 16.dp, top = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 16.dp)
@@ -749,7 +826,11 @@ private fun HistoryRow(
                             }
                         }
                     )
-                }
+                },
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            )
         ) {
             Column(
                 modifier = Modifier
@@ -884,6 +965,163 @@ private fun formatHistoryTimestamp(epochMs: Long): String {
         .format(formatter)
 }
 
+private fun sortedByExpectedFinish(timers: List<ActiveTimerState>): List<ActiveTimerState> {
+    return timers.sortedWith(
+        compareBy<ActiveTimerState>(
+            { if (it.isPaused) 1 else 0 },
+            {
+                if (it.isPaused) {
+                    it.remainingMillis
+                } else {
+                    it.updatedAtElapsedMs + it.remainingMillis
+                }
+            }
+        ).thenBy { it.id }
+    )
+}
+
+@Composable
+private fun RuntimeDebugScreen(
+    modifier: Modifier,
+    runningTimer: RunningTimerState,
+    fontScale: Float
+) {
+    val sortedTimers = sortedByExpectedFinish(runningTimer.activeTimers)
+    val scheduledWake = runningTimer.scheduledWakeElapsedMs
+    val nowElapsed = runningTimer.elapsedRealtimeMs
+    val wakeInMillis = if (scheduledWake > 0L && nowElapsed > 0L) {
+        (scheduledWake - nowElapsed).coerceAtLeast(0L)
+    } else {
+        -1L
+    }
+
+    LazyColumn(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.runtime_debug_alarm_section),
+                        fontSize = (18 * fontScale).sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = stringResource(
+                            R.string.runtime_debug_exact_alarm,
+                            if (runningTimer.exactAlarmAllowed) "true" else "false"
+                        ),
+                        fontSize = (13 * fontScale).sp
+                    )
+                    Text(
+                        text = stringResource(
+                            R.string.runtime_debug_scheduled_elapsed,
+                            if (scheduledWake > 0L) scheduledWake.toString() else "-"
+                        ),
+                        fontSize = (13 * fontScale).sp
+                    )
+                    Text(
+                        text = stringResource(
+                            R.string.runtime_debug_wake_in,
+                            if (wakeInMillis >= 0L) formatDurationMillis(wakeInMillis) else "-"
+                        ),
+                        fontSize = (13 * fontScale).sp
+                    )
+                }
+            }
+        }
+
+        item {
+            Text(
+                text = stringResource(R.string.runtime_debug_timers_section),
+                fontSize = (18 * fontScale).sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+
+        if (sortedTimers.isEmpty()) {
+            item {
+                Text(
+                    text = stringResource(R.string.no_running_timers),
+                    fontSize = (14 * fontScale).sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            items(sortedTimers, key = { "debug-${it.id}" }) { timer ->
+                val title = displayLabel((timer.totalMillis / 1000L).toInt(), timer.label)
+                val elapsed = (timer.totalMillis - timer.remainingMillis).coerceAtLeast(0L)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = title,
+                            fontSize = (17 * fontScale).sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = stringResource(
+                                R.string.runtime_debug_status,
+                                if (timer.isPaused) {
+                                    stringResource(R.string.runtime_debug_paused)
+                                } else {
+                                    stringResource(R.string.runtime_debug_running)
+                                }
+                            ),
+                            fontSize = (13 * fontScale).sp
+                        )
+                        Text(
+                            text = stringResource(R.string.runtime_debug_elapsed, formatDurationMillis(elapsed)),
+                            fontSize = (13 * fontScale).sp
+                        )
+                        Text(
+                            text = stringResource(
+                                R.string.runtime_debug_remaining,
+                                formatDurationMillis(timer.remainingMillis)
+                            ),
+                            fontSize = (13 * fontScale).sp
+                        )
+                        Text(
+                            text = stringResource(
+                                R.string.runtime_debug_total,
+                                formatDurationMillis(timer.totalMillis)
+                            ),
+                            fontSize = (13 * fontScale).sp
+                        )
+                        Text(
+                            text = stringResource(
+                                R.string.runtime_debug_updated_elapsed,
+                                timer.updatedAtElapsedMs
+                            ),
+                            fontSize = (12 * fontScale).sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun LogsScreen(
     modifier: Modifier,
@@ -895,7 +1133,7 @@ private fun LogsScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface)
+            .background(MaterialTheme.colorScheme.background)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -1117,7 +1355,11 @@ private fun TimerRow(
                             onDrag(dragAmount.y)
                         }
                     )
-                }
+                },
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            )
         ) {
         Row(
             modifier = Modifier
@@ -1172,6 +1414,7 @@ private fun SettingsTab(
     onAlarmSoundEnabled: (Boolean) -> Unit,
     onAlarmVibrationEnabled: (Boolean) -> Unit,
     onOpenLogs: () -> Unit,
+    onOpenRuntimeDebug: () -> Unit,
     fontScale: Float
 ) {
     LazyColumn(
@@ -1316,6 +1559,16 @@ private fun SettingsTab(
                 Text(stringResource(R.string.logs_button), fontSize = (14 * fontScale).sp)
             }
         }
+
+        item {
+            HorizontalDivider()
+            Button(
+                onClick = onOpenRuntimeDebug,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(stringResource(R.string.runtime_debug_button), fontSize = (14 * fontScale).sp)
+            }
+        }
     }
 }
 
@@ -1357,7 +1610,10 @@ private fun AddTimerBottomSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = sheetState
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 0.dp
     ) {
         Column(
             modifier = Modifier
@@ -1424,12 +1680,31 @@ private fun WheelPicker(
                     minValue = 0
                     this.maxValue = maxValue
                     value = initialValue.coerceIn(0, maxValue)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        // NumberPicker#setTextSize is available from API 29.
+                        setTextSize(
+                            TypedValue.applyDimension(
+                                TypedValue.COMPLEX_UNIT_SP,
+                                22f,
+                                context.resources.displayMetrics
+                            )
+                        )
+                    }
                     wrapSelectorWheel = true
                     setOnValueChangedListener { _, _, newVal -> onValueChanged(newVal) }
                 }
             },
             update = { picker ->
                 picker.value = initialValue.coerceIn(0, maxValue)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    picker.setTextSize(
+                        TypedValue.applyDimension(
+                            TypedValue.COMPLEX_UNIT_SP,
+                            22f,
+                            picker.context.resources.displayMetrics
+                        )
+                    )
+                }
             },
             modifier = Modifier
                 .height(140.dp)
