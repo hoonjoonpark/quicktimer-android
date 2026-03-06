@@ -50,19 +50,19 @@ object ThemeConfigLoader {
     }
 
     private fun fallback(): ThemeConfig = ThemeConfig(
-        background = Color(0xFF060606),
-        onBackground = Color(0xFFE3E5F0),
-        surface = Color(0xFF2B2B2D),
-        onSurface = Color(0xFFE3E5F0),
-        surfaceVariant = Color(0xFF403F49),
-        onSurfaceVariant = Color(0xFF9A9A9B),
-        primary = Color(0xFF605FE4),
+        background = Color(0xFF0B1320),
+        onBackground = Color(0xFFEAF2FF),
+        surface = Color(0xFF142235),
+        onSurface = Color(0xFFEAF2FF),
+        surfaceVariant = Color(0xFF1F3148),
+        onSurfaceVariant = Color(0xFFB8C8DA),
+        primary = Color(0xFF2D8CFF),
         onPrimary = Color(0xFFFFFFFF),
-        primaryContainer = Color(0xFF2F2F59),
-        onPrimaryContainer = Color(0xFFE3E5F0),
-        secondary = Color(0xFF5C5BA3),
-        onSecondary = Color(0xFFFFFFFF),
-        outline = Color(0xFF403F49)
+        primaryContainer = Color(0xFF1A4373),
+        onPrimaryContainer = Color(0xFFD6E8FF),
+        secondary = Color(0xFF00C2A8),
+        onSecondary = Color(0xFF01211E),
+        outline = Color(0xFF4F6784)
     )
 
     private fun String.toColor(): Color {
