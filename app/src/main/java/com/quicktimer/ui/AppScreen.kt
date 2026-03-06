@@ -596,18 +596,18 @@ private fun RunningTimerCard(
     fontScale: Float
 ) {
     val borderColor = if (isHighlighted) {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.78f)
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
     } else {
-        MaterialTheme.colorScheme.outline.copy(alpha = 0.58f)
+        MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
     }
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isHighlighted) {
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.82f)
+                MaterialTheme.colorScheme.secondaryContainer
             } else {
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f)
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f)
             }
         ),
         border = BorderStroke(1.dp, borderColor)
@@ -625,8 +625,7 @@ private fun RunningTimerCard(
             Text(
                 text = formatDurationMillis(active.remainingMillis),
                 fontSize = (30 * fontScale).sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.primary
+                fontWeight = FontWeight.ExtraBold
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -634,21 +633,13 @@ private fun RunningTimerCard(
             ) {
                 OutlinedButton(
                     onClick = { onLap(active.id) },
-                    modifier = Modifier.weight(1f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.72f)),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.primary
-                    )
+                    modifier = Modifier.weight(1f)
                 ) {
                     Text(stringResource(R.string.lap), fontSize = (13 * fontScale).sp)
                 }
                 FilledTonalButton(
                     onClick = { if (active.isPaused) onResume(active.id) else onPause(active.id) },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+                    modifier = Modifier.weight(1f)
                 ) {
                     Text(
                         text = if (active.isPaused) {
@@ -674,7 +665,7 @@ private fun RunningTimerCard(
                 Text(
                     text = active.laps.joinToString("   "),
                     fontSize = (13 * fontScale).sp,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -736,7 +727,7 @@ private fun HistoryRow(
             modifier = Modifier
                 .matchParentSize()
                 .background(
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f * revealProgress),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = revealProgress),
                     shape = RoundedCornerShape(12.dp)
                 ),
             horizontalArrangement = Arrangement.End,
@@ -752,7 +743,7 @@ private fun HistoryRow(
                 Icon(
                     imageVector = Icons.Default.Delete,
                     contentDescription = stringResource(R.string.delete),
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.4f + 0.6f * revealProgress)
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = revealProgress)
                 )
             }
         }
@@ -780,11 +771,11 @@ private fun HistoryRow(
                 },
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f)
             ),
             border = BorderStroke(
                 1.dp,
-                MaterialTheme.colorScheme.outline.copy(alpha = 0.58f)
+                MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
             )
         ) {
             Column(
@@ -805,8 +796,8 @@ private fun HistoryRow(
                 val startedLabel = stringResource(R.string.history_started_label)
                 val endedLabel = stringResource(R.string.history_ended_label)
                 val lapsLabel = stringResource(R.string.history_laps)
-                val metaTextColor = MaterialTheme.colorScheme.onSurface
-                val metaLabelColor = MaterialTheme.colorScheme.primary
+                val metaTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                val metaLabelColor = MaterialTheme.colorScheme.secondary
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -876,14 +867,14 @@ private fun HistoryRow(
                         Text(
                             text = stringResource(R.string.history_status, statusText),
                             fontSize = (12 * fontScale).sp,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = MaterialTheme.colorScheme.secondary,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1
                         )
                         Text(
                             text = stringResource(R.string.history_extensions, item.extensionCount),
                             fontSize = (12 * fontScale).sp,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = MaterialTheme.colorScheme.secondary,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1
                         )
@@ -1086,7 +1077,7 @@ private fun TimerRow(
             modifier = Modifier
                 .matchParentSize()
                 .background(
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f * revealProgress),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = revealProgress),
                     shape = RoundedCornerShape(12.dp)
                 ),
             horizontalArrangement = Arrangement.End,
@@ -1099,7 +1090,7 @@ private fun TimerRow(
                 Icon(
                     imageVector = Icons.Default.Edit,
                     contentDescription = stringResource(R.string.edit),
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.4f + 0.6f * revealProgress)
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = revealProgress)
                 )
             }
             Spacer(modifier = Modifier.width(8.dp))
@@ -1113,7 +1104,7 @@ private fun TimerRow(
                 Icon(
                     imageVector = Icons.Default.Delete,
                     contentDescription = stringResource(R.string.delete),
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.4f + 0.6f * revealProgress)
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = revealProgress)
                 )
             }
         }
@@ -1158,11 +1149,11 @@ private fun TimerRow(
                 },
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f)
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.28f)
             ),
             border = BorderStroke(
                 1.dp,
-                MaterialTheme.colorScheme.outline.copy(alpha = 0.58f)
+                MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
             )
         ) {
             Row(
@@ -1193,13 +1184,7 @@ private fun TimerRow(
                         )
                     }
                 }
-                Button(
-                    onClick = { onStart(timer) },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    )
-                ) {
+                FilledTonalButton(onClick = { onStart(timer) }) {
                     Text(stringResource(R.string.start), fontSize = (14 * fontScale).sp)
                 }
             }
