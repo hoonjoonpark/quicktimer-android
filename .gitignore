@@ -1,0 +1,46 @@
+# macOS
+.DS_Store
+
+# IntelliJ / Android Studio
+.idea/
+*.iml
+
+# Gradle
+.gradle/
+**/build/
+
+# Kotlin
+.kotlin/
+
+# Local SDK config
+local.properties
+
+# Android generated files
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Signing / secrets
+*.jks
+*.keystore
+keystore.properties
+
+# Logs
+*.log
+
+# Android artifacts
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+
+# Google services (if used)
+google-services.json
+
+# Native / profiling outputs
+*.hprof
+
+# Misc temp
+*.tmp
+*.swp
