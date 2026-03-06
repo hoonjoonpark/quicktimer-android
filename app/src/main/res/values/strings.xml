@@ -25,6 +25,10 @@
     <string name="simulate_purchase_hint">Toggle for remove-ads simulation</string>
     <string name="delay_intervention">Delay intervention</string>
     <string name="delay_intervention_hint">ON: defer tick-loop completion alert and simulate AlarmManager intervention path.</string>
+    <string name="alarm_sound">Alarm sound</string>
+    <string name="alarm_sound_hint">Play sound when timer completes</string>
+    <string name="alarm_vibration">Alarm vibration</string>
+    <string name="alarm_vibration_hint">Vibrate when timer completes</string>
     <string name="quick_timer_ready">Quick Timer is ready</string>
     <string name="tap_to_open">Tap to open app</string>
     <string name="pause">Pause</string>

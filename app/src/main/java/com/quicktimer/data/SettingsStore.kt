@@ -16,6 +16,8 @@ class SettingsStore(private val context: Context) {
     private val fontKey = stringPreferencesKey("font_size")
     private val adsRemovedKey = booleanPreferencesKey("ads_removed")
     private val delayInterventionKey = booleanPreferencesKey("delay_intervention")
+    private val alarmSoundEnabledKey = booleanPreferencesKey("alarm_sound_enabled")
+    private val alarmVibrationEnabledKey = booleanPreferencesKey("alarm_vibration_enabled")
 
     val settingsFlow: Flow<AppSettings> = context.settingsDataStore.data.map { prefs ->
         AppSettings(
@@ -23,7 +25,9 @@ class SettingsStore(private val context: Context) {
             fontSize = runCatching { FontSize.valueOf(prefs[fontKey] ?: FontSize.NORMAL.name) }
                 .getOrElse { FontSize.NORMAL },
             adsRemoved = prefs[adsRemovedKey] ?: false,
-            delayIntervention = prefs[delayInterventionKey] ?: false
+            delayIntervention = prefs[delayInterventionKey] ?: false,
+            alarmSoundEnabled = prefs[alarmSoundEnabledKey] ?: true,
+            alarmVibrationEnabled = prefs[alarmVibrationEnabledKey] ?: true
         )
     }
 
@@ -41,5 +45,13 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setDelayIntervention(enabled: Boolean) {
         context.settingsDataStore.edit { it[delayInterventionKey] = enabled }
+    }
+
+    suspend fun setAlarmSoundEnabled(enabled: Boolean) {
+        context.settingsDataStore.edit { it[alarmSoundEnabledKey] = enabled }
+    }
+
+    suspend fun setAlarmVibrationEnabled(enabled: Boolean) {
+        context.settingsDataStore.edit { it[alarmVibrationEnabledKey] = enabled }
     }
 }
