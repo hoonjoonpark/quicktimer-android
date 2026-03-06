@@ -1,9 +1,41 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.kapt")
 }
+
+fun loadPropertiesFile(path: String): Properties {
+    val props = Properties()
+    val file = rootProject.file(path)
+    if (file.exists()) {
+        file.inputStream().use { props.load(it) }
+    }
+    return props
+}
+
+val projectLocalProps = loadPropertiesFile("local.properties")
+val projectGradleProps = loadPropertiesFile("gradle.properties")
+
+fun propFromProjectOrEnv(name: String): String? {
+    val localValue = projectLocalProps.getProperty(name)?.trim()
+    if (!localValue.isNullOrEmpty()) return localValue
+    val projectValue = projectGradleProps.getProperty(name)?.trim()
+    if (!projectValue.isNullOrEmpty()) return projectValue
+    val envValue = System.getenv(name)?.trim()
+    if (!envValue.isNullOrEmpty()) return envValue
+    return null
+}
+
+val testBannerAdUnit = "ca-app-pub-3940256099942544/9214589741"
+val testInterstitialAdUnit = "ca-app-pub-3940256099942544/1033173712"
+
+val devBannerAdUnit = propFromProjectOrEnv("ADMOB_DEV_BANNER_UNIT_ID") ?: testBannerAdUnit
+val devInterstitialAdUnit = propFromProjectOrEnv("ADMOB_DEV_INTERSTITIAL_UNIT_ID") ?: testInterstitialAdUnit
+val prodBannerAdUnit = propFromProjectOrEnv("ADMOB_PROD_BANNER_UNIT_ID") ?: testBannerAdUnit
+val prodInterstitialAdUnit = propFromProjectOrEnv("ADMOB_PROD_INTERSTITIAL_UNIT_ID") ?: testInterstitialAdUnit
 
 android {
     namespace = "com.quicktimer"
@@ -32,6 +64,21 @@ android {
         }
     }
 
+    flavorDimensions += "env"
+    productFlavors {
+        create("dev") {
+            dimension = "env"
+            buildConfigField("String", "AD_UNIT_BANNER", "\"$devBannerAdUnit\"")
+            buildConfigField("String", "AD_UNIT_INTERSTITIAL", "\"$devInterstitialAdUnit\"")
+        }
+        create("prod") {
+            dimension = "env"
+            // Defaults to test ad units until production IDs are provided via gradle properties/env.
+            buildConfigField("String", "AD_UNIT_BANNER", "\"$prodBannerAdUnit\"")
+            buildConfigField("String", "AD_UNIT_INTERSTITIAL", "\"$prodInterstitialAdUnit\"")
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -43,6 +90,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {
@@ -50,6 +98,12 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+}
+
+tasks.register("assembleProdRel") {
+    group = "build"
+    description = "Assemble the prodRelease variant."
+    dependsOn("assembleProdRelease")
 }
 
 dependencies {

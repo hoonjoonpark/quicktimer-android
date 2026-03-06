@@ -35,8 +35,24 @@
 CLI로 빌드할 경우:
 
 ```bash
-./gradlew assembleDebug
+./gradlew :app:assembleDevDebug
+./gradlew :app:assembleProdRelease
+# alias
+./gradlew :app:assembleProdRel
 ```
+
+## 광고 유닛 설정
+- 광고 유닛은 flavor별 `BuildConfig`로 주입됩니다 (`dev`/`prod`).
+- 값은 아래 우선순위로 읽습니다:
+  1. 프로젝트 루트 `local.properties` (gitignore, 개인/로컬용)
+  2. 프로젝트 루트 `gradle.properties` (프로젝트 공통값)
+  3. CI 환경변수
+- 키:
+  - `ADMOB_DEV_BANNER_UNIT_ID`
+  - `ADMOB_DEV_INTERSTITIAL_UNIT_ID`
+  - `ADMOB_PROD_BANNER_UNIT_ID`
+  - `ADMOB_PROD_INTERSTITIAL_UNIT_ID`
+- 키가 없으면 Google 테스트 유닛으로 fallback 됩니다.
 
 ## 프로젝트 구조
 - `app/src/main/java/com/quicktimer`

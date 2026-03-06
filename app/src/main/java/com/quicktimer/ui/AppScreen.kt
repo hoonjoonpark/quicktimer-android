@@ -3,7 +3,6 @@ package com.quicktimer.ui
 import android.content.Intent
 import android.os.Build
 import android.util.TypedValue
-import android.view.ViewGroup
 import android.widget.NumberPicker
 import android.widget.Toast
 import androidx.compose.animation.core.animateFloatAsState
@@ -12,6 +11,7 @@ import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -83,6 +83,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.AdView
+import com.quicktimer.BuildConfig
 import com.quicktimer.R
 import com.quicktimer.data.FontSize
 import com.quicktimer.data.TimerHistory
@@ -1687,24 +1688,45 @@ private fun WheelPicker(
 
 @Composable
 private fun AdBanner() {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp),
+    val context = LocalContext.current
+    val density = LocalDensity.current
+
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxWidth(),
         contentAlignment = Alignment.Center
     ) {
-        AndroidView(
-            factory = { context ->
-                AdView(context).apply {
-                    setAdSize(AdSize.BANNER)
-                    setAdUnitId("ca-app-pub-3940256099942544/6300978111")
-                    layoutParams = ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                    )
-                    loadAd(AdRequest.Builder().build())
+        val adWidthDp = maxWidth.value.toInt().coerceAtLeast(1)
+        val adSize = remember(adWidthDp) {
+            AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(context, adWidthDp)
+        }
+        val adHeightDp = with(density) {
+            adSize.getHeightInPixels(context).toDp().coerceAtLeast(50.dp)
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(adHeightDp + 6.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            AndroidView(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(adHeightDp),
+                factory = { viewContext ->
+                    AdView(viewContext).apply {
+                        setAdUnitId(BuildConfig.AD_UNIT_BANNER)
+                        setAdSize(adSize)
+                        loadAd(AdRequest.Builder().build())
+                    }
+                },
+                update = { adView ->
+                    if (adView.adSize != adSize) {
+                        adView.setAdSize(adSize)
+                        adView.loadAd(AdRequest.Builder().build())
+                    }
                 }
-            }
-        )
+            )
+        }
     }
 }

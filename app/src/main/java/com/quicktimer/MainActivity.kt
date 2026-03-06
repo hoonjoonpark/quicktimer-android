@@ -237,7 +237,7 @@ class MainActivity : ComponentActivity() {
     private fun showInterstitialAd() {
         InterstitialAd.load(
             this,
-            "ca-app-pub-3940256099942544/1033173712",
+            BuildConfig.AD_UNIT_INTERSTITIAL,
             AdRequest.Builder().build(),
             object : InterstitialAdLoadCallback() {
                 override fun onAdLoaded(ad: InterstitialAd) {
