@@ -633,14 +633,12 @@ class TimerForegroundService : Service() {
             Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
         }.getOrDefault(true)
         val primary = selectSoonestTimer()
-        val primaryId = primary?.id
         val active = timers.map { timer ->
             ActiveTimerState(
                 id = timer.id,
                 totalMillis = timer.totalMillis,
                 remainingMillis = timer.remainingMillis,
                 label = timer.label,
-                isPrimary = timer.id == primaryId,
                 isPaused = timer.isPaused,
                 updatedAtElapsedMs = timer.updatedAtElapsedMs,
                 laps = timer.laps.toList()

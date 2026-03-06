@@ -3,13 +3,16 @@ package com.quicktimer
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.appcompat.app.AlertDialog
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,12 +40,19 @@ class MainActivity : ComponentActivity() {
     private val viewModel: AppViewModel by viewModels()
     private var interstitialAd: InterstitialAd? = null
     private var runningTabNavigationRequest: RunningTabNavigationRequest? by mutableStateOf(null)
+    private var notificationDialog: AlertDialog? = null
+    private val permissionPrefs by lazy {
+        getSharedPreferences("permission_prompts", MODE_PRIVATE)
+    }
 
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) {
+                notificationDialog?.dismiss()
                 viewModel.ensureService()
                 TimerServiceController.refreshQuickActions(this)
+            } else {
+                handleNotificationPermissionDenied()
             }
         }
 
@@ -88,15 +98,101 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun maybeRequestNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val granted = ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.POST_NOTIFICATIONS
-            ) == PackageManager.PERMISSION_GRANTED
-            if (!granted) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        if (hasNotificationPermission()) return
+
+        val requestedBefore = permissionPrefs.getBoolean(KEY_POST_NOTIFICATIONS_REQUESTED, false)
+        when {
+            !requestedBefore -> showNotificationPrimerDialog()
+            shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS) ->
+                showNotificationRationaleDialog()
+            else -> showNotificationSettingsDialog()
+        }
+    }
+
+    private fun hasNotificationPermission(): Boolean {
+        return ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun markNotificationPermissionRequested() {
+        permissionPrefs.edit()
+            .putBoolean(KEY_POST_NOTIFICATIONS_REQUESTED, true)
+            .apply()
+    }
+
+    private fun handleNotificationPermissionDenied() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        if (shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) {
+            showNotificationRationaleDialog()
+        } else {
+            showNotificationSettingsDialog()
+        }
+    }
+
+    private fun showNotificationPrimerDialog() {
+        showNotificationDialog(
+            title = getString(R.string.notification_permission_required_title),
+            message = getString(R.string.notification_permission_primer_message),
+            positiveLabel = getString(R.string.notification_permission_continue),
+            onPositive = {
+                markNotificationPermissionRequested()
                 requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
+        )
+    }
+
+    private fun showNotificationRationaleDialog() {
+        showNotificationDialog(
+            title = getString(R.string.notification_permission_required_title),
+            message = getString(R.string.notification_permission_rationale_message),
+            positiveLabel = getString(R.string.notification_permission_retry),
+            onPositive = {
+                markNotificationPermissionRequested()
+                requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        )
+    }
+
+    private fun showNotificationSettingsDialog() {
+        showNotificationDialog(
+            title = getString(R.string.notification_permission_required_title),
+            message = getString(R.string.notification_permission_settings_message),
+            positiveLabel = getString(R.string.open_settings),
+            onPositive = { openNotificationSettings() }
+        )
+    }
+
+    private fun showNotificationDialog(
+        title: String,
+        message: String,
+        positiveLabel: String,
+        onPositive: () -> Unit
+    ) {
+        if (isFinishing || isDestroyed) return
+        notificationDialog?.dismiss()
+        notificationDialog = AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage(message)
+            .setPositiveButton(positiveLabel) { _, _ -> onPositive() }
+            .setNegativeButton(R.string.later, null)
+            .create()
+        notificationDialog?.show()
+    }
+
+    private fun openNotificationSettings() {
+        val notificationSettingsIntent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+            putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
         }
+        runCatching { startActivity(notificationSettingsIntent) }
+            .onFailure {
+                val fallbackIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", packageName, null)
+                }
+                startActivity(fallbackIntent)
+            }
     }
 
     private fun handleNotificationEntry(intent: Intent?) {
@@ -166,5 +262,6 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_FROM_ALARM = "from_alarm"
         const val EXTRA_FROM_RUNNING_NOTIFICATION = "from_running_notification"
         const val EXTRA_TARGET_TIMER_ID = "target_timer_id"
+        private const val KEY_POST_NOTIFICATIONS_REQUESTED = "post_notifications_requested"
     }
 }

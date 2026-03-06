@@ -555,6 +555,85 @@ private fun TimerTab(
     }
 }
 
+private fun runningTimerTitle(active: ActiveTimerState): String {
+    val durationLabel = formatDuration((active.totalMillis / 1000L).toInt())
+    return if (active.label.isBlank()) {
+        durationLabel
+    } else {
+        "${active.label} ($durationLabel)"
+    }
+}
+
+@Composable
+private fun RunningTimerCard(
+    active: ActiveTimerState,
+    highlighted: Boolean,
+    onPause: (Int) -> Unit,
+    onResume: (Int) -> Unit,
+    onStop: (Int) -> Unit,
+    onLap: (Int) -> Unit,
+    fontScale: Float
+) {
+    val titleLabel = runningTimerTitle(active)
+    val containerColor = if (highlighted) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = containerColor)
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                text = titleLabel,
+                fontSize = (18 * fontScale).sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = formatDurationMillis(active.remainingMillis),
+                fontSize = (30 * fontScale).sp,
+                fontWeight = FontWeight.ExtraBold
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = { onLap(active.id) },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(stringResource(R.string.lap), fontSize = (14 * fontScale).sp)
+                }
+                Button(
+                    onClick = { if (active.isPaused) onResume(active.id) else onPause(active.id) },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        if (active.isPaused) stringResource(R.string.resume) else stringResource(R.string.pause),
+                        fontSize = (14 * fontScale).sp
+                    )
+                }
+                Button(
+                    onClick = { onStop(active.id) },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(stringResource(R.string.stop), fontSize = (14 * fontScale).sp)
+                }
+            }
+            if (active.laps.isNotEmpty()) {
+                Text(
+                    text = active.laps.joinToString("   "),
+                    fontSize = (13 * fontScale).sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun RunningTab(
     modifier: Modifier,
@@ -611,123 +690,15 @@ private fun RunningTab(
         contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 16.dp)
     ) {
         itemsIndexed(sortedActiveTimers, key = { _, timer -> "running-${timer.id}" }) { _, active ->
-            val isHighlighted = active.id == flashingTimerId
-            val cardModifier = Modifier.fillMaxWidth()
-            val durationLabel = formatDuration((active.totalMillis / 1000L).toInt())
-            val titleLabel = if (active.label.isBlank()) {
-                durationLabel
-            } else {
-                "${active.label} ($durationLabel)"
-            }
-            if (isHighlighted) {
-                Card(
-                    modifier = cardModifier,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
-                    )
-                ) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(
-                            text = titleLabel,
-                            fontSize = (18 * fontScale).sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = formatDurationMillis(active.remainingMillis),
-                            fontSize = (30 * fontScale).sp,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Button(
-                                onClick = { onLap(active.id) },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(stringResource(R.string.lap), fontSize = (14 * fontScale).sp)
-                            }
-                            Button(
-                                onClick = { if (active.isPaused) onResume(active.id) else onPause(active.id) },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(
-                                    if (active.isPaused) stringResource(R.string.resume) else stringResource(R.string.pause),
-                                    fontSize = (14 * fontScale).sp
-                                )
-                            }
-                            Button(
-                                onClick = { onStop(active.id) },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(stringResource(R.string.stop), fontSize = (14 * fontScale).sp)
-                            }
-                        }
-                        if (active.laps.isNotEmpty()) {
-                            Text(
-                                text = active.laps.joinToString("   "),
-                                fontSize = (13 * fontScale).sp,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                }
-            } else {
-                Card(
-                    modifier = cardModifier,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    )
-                ) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(
-                            text = titleLabel,
-                            fontSize = (18 * fontScale).sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = formatDurationMillis(active.remainingMillis),
-                            fontSize = (30 * fontScale).sp,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Button(
-                                onClick = { onLap(active.id) },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(stringResource(R.string.lap), fontSize = (14 * fontScale).sp)
-                            }
-                            Button(
-                                onClick = { if (active.isPaused) onResume(active.id) else onPause(active.id) },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(
-                                    if (active.isPaused) stringResource(R.string.resume) else stringResource(R.string.pause),
-                                    fontSize = (14 * fontScale).sp
-                                )
-                            }
-                            Button(
-                                onClick = { onStop(active.id) },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(stringResource(R.string.stop), fontSize = (14 * fontScale).sp)
-                            }
-                        }
-                        if (active.laps.isNotEmpty()) {
-                            Text(
-                                text = active.laps.joinToString("   "),
-                                fontSize = (13 * fontScale).sp,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                }
-            }
+            RunningTimerCard(
+                active = active,
+                highlighted = active.id == flashingTimerId,
+                onPause = onPause,
+                onResume = onResume,
+                onStop = onStop,
+                onLap = onLap,
+                fontScale = fontScale
+            )
         }
     }
 }

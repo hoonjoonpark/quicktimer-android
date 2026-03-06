@@ -9,7 +9,6 @@ data class ActiveTimerState(
     val totalMillis: Long,
     val remainingMillis: Long,
     val label: String = "",
-    val isPrimary: Boolean = false,
     val isPaused: Boolean = false,
     val updatedAtElapsedMs: Long = 0L,
     val laps: List<String> = emptyList()
