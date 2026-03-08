@@ -13,6 +13,7 @@ private val Context.settingsDataStore by preferencesDataStore(name = "app_settin
 
 class SettingsStore(private val context: Context) {
     private val languageKey = stringPreferencesKey("language_tag")
+    private val themeModeKey = stringPreferencesKey("theme_mode")
     private val fontKey = stringPreferencesKey("font_size")
     private val adsRemovedKey = booleanPreferencesKey("ads_removed")
     private val delayInterventionKey = booleanPreferencesKey("delay_intervention")
@@ -22,6 +23,9 @@ class SettingsStore(private val context: Context) {
     val settingsFlow: Flow<AppSettings> = context.settingsDataStore.data.map { prefs ->
         AppSettings(
             languageTag = prefs[languageKey] ?: "system",
+            themeMode = runCatching {
+                AppThemeMode.valueOf(prefs[themeModeKey] ?: AppThemeMode.DARK.name)
+            }.getOrElse { AppThemeMode.DARK },
             fontSize = runCatching { FontSize.valueOf(prefs[fontKey] ?: FontSize.NORMAL.name) }
                 .getOrElse { FontSize.NORMAL },
             adsRemoved = prefs[adsRemovedKey] ?: false,
@@ -33,6 +37,10 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setLanguageTag(tag: String) {
         context.settingsDataStore.edit { it[languageKey] = tag }
+    }
+
+    suspend fun setThemeMode(mode: AppThemeMode) {
+        context.settingsDataStore.edit { it[themeModeKey] = mode.name }
     }
 
     suspend fun setFontSize(size: FontSize) {

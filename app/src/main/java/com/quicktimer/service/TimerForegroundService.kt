@@ -3,6 +3,7 @@ package com.quicktimer.service
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.AlarmManager
+import android.app.KeyguardManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -19,6 +20,7 @@ import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -99,6 +101,7 @@ class TimerForegroundService : Service() {
     private var completionVibrator: Vibrator? = null
     private var completionAlertActive = false
     private var lastCompletedSpec: CompletedTimerSpec? = null
+    private var lastCompletedAtEpochMs: Long = -1L
     private var scheduledWakeElapsedMs: Long = -1L
     private var delayInterventionEnabled = false
     private var alarmSoundEnabled = true
@@ -393,6 +396,9 @@ class TimerForegroundService : Service() {
         ensureTicker(reschedule = true)
         publishState()
         syncNotifications()
+        if (source == TimerServiceController.START_SOURCE_WIDGET) {
+            vibrateForWidgetStart()
+        }
     }
 
     private suspend fun pauseTimer(timerId: Int) {
@@ -553,6 +559,7 @@ class TimerForegroundService : Service() {
         if (anyCompleted) {
             if (completedSpec != null) {
                 lastCompletedSpec = completedSpec
+                lastCompletedAtEpochMs = System.currentTimeMillis()
                 logEvent(
                     "TIMER_COMPLETE[${trigger.tag}] ${displayLabel(completedSpec.durationSeconds, completedSpec.label)} " +
                         "(${formatDuration(completedSpec.durationSeconds)})"
@@ -882,6 +889,15 @@ class TimerForegroundService : Service() {
         } else {
             "${primary.label} ($durationLabel)"
         }
+        val totalMillis = primary.totalMillis.coerceAtLeast(1L)
+        val elapsedMillis = (totalMillis - primary.remainingMillis).coerceIn(0L, totalMillis)
+        val progressMax = 1000
+        val progress = ((elapsedMillis * progressMax) / totalMillis).toInt()
+        val expandedView = RemoteViews(packageName, R.layout.notification_running_expanded).apply {
+            setTextViewText(R.id.running_title, contentLabel)
+            setTextViewText(R.id.running_remaining, remainingText)
+            setProgressBar(R.id.running_progress, progressMax, progress, false)
+        }
 
         return NotificationCompat.Builder(this, RUNNING_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
@@ -894,10 +910,9 @@ class TimerForegroundService : Service() {
             .setContentTitle(contentLabel)
             .setContentText(remainingText)
             .setSubText(null)
+            .setCustomBigContentView(expandedView)
             .setStyle(
-                NotificationCompat.BigTextStyle()
-                    .setBigContentTitle(contentLabel)
-                    .bigText(remainingText)
+                NotificationCompat.DecoratedCustomViewStyle()
             )
             .setWhen(0L)
             .setShowWhen(false)
@@ -925,43 +940,93 @@ class TimerForegroundService : Service() {
     }
 
     private fun buildCompletionNotification(): Notification {
-        val openIntent = PendingIntent.getActivity(
+        val spec = lastCompletedSpec
+        val fullScreenIntent = fullScreenAlarmPendingIntent()
+        val openMainIntent = completionOpenAppPendingIntent()
+        val extendIntent = completionExtendPendingIntent(spec)
+        val builder = NotificationCompat.Builder(this, COMPLETION_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentIntent(openMainIntent)
+            .setContentTitle(completionNotificationTitle(spec))
+            .setContentText(getString(R.string.tap_to_stop_alarm))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setOngoing(true)
+            .setAutoCancel(false)
+            .setOnlyAlertOnce(false)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setCustomHeadsUpContentView(
+                buildCompletionHeadsUpView(
+                    spec = spec,
+                    openMainIntent = openMainIntent,
+                    extendIntent = extendIntent
+                )
+            )
+            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+
+        if (isDeviceLocked()) {
+            builder.setFullScreenIntent(fullScreenIntent, true)
+        }
+
+        if (extendIntent != null) {
+            builder.addAction(
+                android.R.drawable.ic_popup_sync,
+                getString(R.string.extend_time),
+                extendIntent
+            )
+        }
+        return builder.build()
+    }
+
+    private fun buildCompletionHeadsUpView(
+        spec: CompletedTimerSpec?,
+        openMainIntent: PendingIntent,
+        extendIntent: PendingIntent?
+    ): RemoteViews {
+        val view = RemoteViews(packageName, R.layout.notification_completion_heads_up)
+        view.setTextViewText(R.id.completion_heads_up_title, completionNotificationTitle(spec))
+        view.setTextViewText(R.id.completion_heads_up_message, getString(R.string.tap_to_stop_alarm))
+        view.setTextViewText(R.id.completion_heads_up_extend, getString(R.string.extend_time))
+        view.setOnClickPendingIntent(R.id.completion_heads_up_root, openMainIntent)
+
+        if (extendIntent != null) {
+            view.setViewVisibility(R.id.completion_heads_up_extend, android.view.View.VISIBLE)
+            view.setOnClickPendingIntent(R.id.completion_heads_up_extend, extendIntent)
+        } else {
+            view.setViewVisibility(R.id.completion_heads_up_extend, android.view.View.GONE)
+        }
+        return view
+    }
+
+    private fun completionOpenAppPendingIntent(): PendingIntent {
+        return PendingIntent.getActivity(
             this,
-            9,
+            REQUEST_CODE_COMPLETION_OPEN_APP,
             mainActivityIntent()
                 .putExtra(MainActivity.EXTRA_FROM_ALARM, true)
                 .putExtra(MainActivity.EXTRA_FROM_NOTIFICATION, true),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-        val builder = NotificationCompat.Builder(this, COMPLETION_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentIntent(openIntent)
-            .setContentTitle(completionNotificationTitle(lastCompletedSpec))
-            .setContentText(getString(R.string.tap_to_stop_alarm))
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setOngoing(true)
-            .setAutoCancel(false)
-            .setOnlyAlertOnce(true)
+    }
 
-        val spec = lastCompletedSpec
-        if (spec != null && spec.durationSeconds > 0) {
-            builder.addAction(
-                android.R.drawable.ic_popup_sync,
-                getString(R.string.extend_time),
-                startIntentForPreset(
-                    spec.durationSeconds,
-                    spec.label,
-                    901,
-                    TimerServiceController.START_SOURCE_EXTEND,
-                    sessionId = spec.sessionId,
-                    sessionStartedAtEpochMs = spec.sessionStartedAtEpochMs,
-                    extensionCount = spec.extensionCount
-                )
-            )
-        }
+    private fun completionExtendPendingIntent(spec: CompletedTimerSpec?): PendingIntent? {
+        val activeSpec = spec ?: return null
+        if (activeSpec.durationSeconds <= 0) return null
+        return startIntentForPreset(
+            activeSpec.durationSeconds,
+            activeSpec.label,
+            REQUEST_CODE_COMPLETION_EXTEND,
+            TimerServiceController.START_SOURCE_EXTEND,
+            sessionId = activeSpec.sessionId,
+            sessionStartedAtEpochMs = activeSpec.sessionStartedAtEpochMs,
+            extensionCount = activeSpec.extensionCount
+        )
+    }
 
-        return builder.build()
+    private fun isDeviceLocked(): Boolean {
+        val keyguardManager = ContextCompat.getSystemService(this, KeyguardManager::class.java)
+        return keyguardManager?.isKeyguardLocked == true
     }
 
     private fun startCompletionAlert(trigger: CompletionTrigger) {
@@ -1015,6 +1080,27 @@ class TimerForegroundService : Service() {
         NotificationManagerCompat.from(this).cancel(COMPLETION_NOTIFICATION_ID)
         publishState()
         syncNotifications()
+    }
+
+    private fun vibrateForWidgetStart() {
+        val vibrator = runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val manager = getSystemService(VIBRATOR_MANAGER_SERVICE) as VibratorManager
+                manager.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                getSystemService(VIBRATOR_SERVICE) as Vibrator
+            }
+        }.getOrNull() ?: return
+
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(VibrationEffect.createOneShot(70L, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(70L)
+            }
+        }
     }
 
     private fun actionIntent(action: String, requestCode: Int, timerId: Int = 0): PendingIntent {
@@ -1074,42 +1160,85 @@ class TimerForegroundService : Service() {
     private fun createChannels() {
         val quickChannel = NotificationChannel(
             QUICK_CHANNEL_ID,
-            "Quick timer",
+            getString(R.string.notification_channel_quick_name),
             NotificationManager.IMPORTANCE_LOW
         )
-        quickChannel.description = "Quick action buttons"
+        quickChannel.description = getString(R.string.notification_channel_quick_description)
         quickChannel.enableVibration(false)
         quickChannel.setSound(null, null)
 
         val runningChannel = NotificationChannel(
             RUNNING_CHANNEL_ID,
-            "Running timer",
+            getString(R.string.notification_channel_running_name),
             NotificationManager.IMPORTANCE_LOW
         )
-        runningChannel.description = "Running countdown and controls"
+        runningChannel.description = getString(R.string.notification_channel_running_description)
         runningChannel.enableVibration(false)
         runningChannel.setSound(null, null)
 
         val completionChannel = NotificationChannel(
             COMPLETION_CHANNEL_ID,
-            "Timer complete",
+            getString(R.string.notification_channel_completion_name),
             NotificationManager.IMPORTANCE_HIGH
         )
-        completionChannel.description = "Timer completion alert"
+        completionChannel.description = getString(R.string.notification_channel_completion_description)
+        completionChannel.enableVibration(true)
+        completionChannel.enableLights(true)
+        completionChannel.lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+        val alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        completionChannel.setSound(
+            alarmUri,
+            AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+        )
         val manager = ContextCompat.getSystemService(this, NotificationManager::class.java)
         manager?.createNotificationChannel(quickChannel)
         manager?.createNotificationChannel(runningChannel)
         manager?.createNotificationChannel(completionChannel)
     }
 
+    private fun fullScreenAlarmPendingIntent(): PendingIntent {
+        val spec = lastCompletedSpec
+        val label = spec?.label.orEmpty()
+        val durationSeconds = spec?.durationSeconds ?: 0
+        val sessionId = spec?.sessionId ?: 0L
+        val sessionStartedAt = spec?.sessionStartedAtEpochMs ?: 0L
+        val extensionCount = spec?.extensionCount ?: -1
+        val completedAt = if (lastCompletedAtEpochMs > 0L) lastCompletedAtEpochMs else System.currentTimeMillis()
+        return PendingIntent.getActivity(
+            this,
+            9,
+            Intent(this, com.quicktimer.ui.AlarmFullscreenActivity::class.java)
+                .putExtra(EXTRA_ALARM_LABEL, label)
+                .putExtra(EXTRA_ALARM_DURATION_SECONDS, durationSeconds)
+                .putExtra(EXTRA_ALARM_SESSION_ID, sessionId)
+                .putExtra(EXTRA_ALARM_SESSION_STARTED_AT_MS, sessionStartedAt)
+                .putExtra(EXTRA_ALARM_EXTENSION_COUNT, extensionCount)
+                .putExtra(EXTRA_ALARM_COMPLETED_AT_MS, completedAt)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+    }
+
     companion object {
         private const val DELAY_SIMULATION_WAKE_MS = 250L
         private const val LAP_SEPARATOR = "\u001F"
+        private const val REQUEST_CODE_COMPLETION_OPEN_APP = 910
+        private const val REQUEST_CODE_COMPLETION_EXTEND = 901
         private const val QUICK_CHANNEL_ID = "quick_timer_quick_channel_v2"
         private const val RUNNING_CHANNEL_ID = "quick_timer_running_channel_v2"
-        private const val COMPLETION_CHANNEL_ID = "quick_timer_completion_channel_v1"
+        private const val COMPLETION_CHANNEL_ID = TimerServiceController.COMPLETION_CHANNEL_ID
         private const val QUICK_NOTIFICATION_ID = 1001
         private const val RUNNING_NOTIFICATION_ID = 1002
         private const val COMPLETION_NOTIFICATION_ID = 1003
+        const val EXTRA_ALARM_LABEL = "alarm_label"
+        const val EXTRA_ALARM_DURATION_SECONDS = "alarm_duration_seconds"
+        const val EXTRA_ALARM_SESSION_ID = "alarm_session_id"
+        const val EXTRA_ALARM_SESSION_STARTED_AT_MS = "alarm_session_started_at_ms"
+        const val EXTRA_ALARM_EXTENSION_COUNT = "alarm_extension_count"
+        const val EXTRA_ALARM_COMPLETED_AT_MS = "alarm_completed_at_ms"
     }
 }

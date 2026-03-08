@@ -36,8 +36,15 @@ enum class FontSize {
     LARGE
 }
 
+enum class AppThemeMode {
+    SYSTEM,
+    LIGHT,
+    DARK
+}
+
 data class AppSettings(
     val languageTag: String = "system",
+    val themeMode: AppThemeMode = AppThemeMode.DARK,
     val fontSize: FontSize = FontSize.NORMAL,
     val adsRemoved: Boolean = false,
     val delayIntervention: Boolean = false,

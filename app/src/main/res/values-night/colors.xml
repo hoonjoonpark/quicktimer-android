@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_surface">#15171A</color>
+    <color name="widget_item_surface">#1F2328</color>
+    <color name="widget_header_text">#F4F7FA</color>
+    <color name="widget_item_title">#F4F7FA</color>
+    <color name="widget_item_subtitle">#C2CAD2</color>
+    <color name="widget_empty_text">#B8C1CA</color>
+    <color name="widget_start_bg">#2E8FA2</color>
+    <color name="widget_start_text">#FFFFFF</color>
+    <color name="notification_heads_up_title">#FFFFFF</color>
+    <color name="notification_heads_up_message">#F2F5F8</color>
+    <color name="notification_running_title">#DDE3EA</color>
+    <color name="notification_running_remaining">#FFFFFF</color>
+</resources>

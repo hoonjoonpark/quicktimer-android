@@ -1,4 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="app_background_dark">#050506</color>
+    <color name="widget_surface">#F5F6F7</color>
+    <color name="widget_item_surface">#FFFFFF</color>
+    <color name="widget_header_text">#111111</color>
+    <color name="widget_item_title">#111111</color>
+    <color name="widget_item_subtitle">#5E5E5E</color>
+    <color name="widget_empty_text">#505050</color>
+    <color name="widget_start_bg">#1F7A8C</color>
+    <color name="widget_start_text">#FFFFFF</color>
+    <color name="number_picker_text_light">#111111</color>
+    <color name="number_picker_text_dark">#F4F4F4</color>
+    <color name="notification_heads_up_title">#111111</color>
+    <color name="notification_heads_up_message">#2C2C2C</color>
+    <color name="notification_running_title">#2A2A2A</color>
+    <color name="notification_running_remaining">#111111</color>
 </resources>

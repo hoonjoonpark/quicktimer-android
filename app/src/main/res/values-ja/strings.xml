@@ -44,6 +44,8 @@
     <string name="notification_permission_primer_message">タイマー通知と操作には通知権限が必要です。</string>
     <string name="notification_permission_rationale_message">通知がオフのため、一部機能が使えません。</string>
     <string name="notification_permission_settings_message">権限がブロックされています。設定で通知をオンにしてください。</string>
+    <string name="exact_alarm_permission_required_title">正確なアラーム権限</string>
+    <string name="exact_alarm_permission_message">タイマー完了通知の精度を高めるため、正確なアラームを許可してください。</string>
     <string name="notification_permission_continue">許可する</string>
     <string name="notification_permission_retry">再リクエスト</string>
     <string name="open_settings">設定を開く</string>
@@ -88,6 +90,25 @@
     <string name="runtime_debug_remaining">残り: %1$s</string>
     <string name="runtime_debug_total">合計: %1$s</string>
     <string name="runtime_debug_updated_elapsed">最終ティック elapsedRealtime: %1$d</string>
+    <string name="alarm_permission_flow">アラーム権限</string>
+    <string name="exact_alarm_status">正確なアラーム: %1$s</string>
+    <string name="request_exact_alarm_permission">正確なアラームを許可</string>
+    <string name="full_screen_intent_status">全画面アラーム: %1$s</string>
+    <string name="allow_full_screen_alarm">全画面アラームを許可</string>
+    <string name="open_alarm_channel_settings">アラームチャンネル設定</string>
+    <string name="notification_channel_quick_name">クイックタイマー</string>
+    <string name="notification_channel_quick_description">クイック操作ボタン</string>
+    <string name="notification_channel_running_name">実行中タイマー</string>
+    <string name="notification_channel_running_description">カウントダウンと操作</string>
+    <string name="notification_channel_completion_name">タイマー完了</string>
+    <string name="notification_channel_completion_description">タイマー完了通知</string>
+    <string name="permission_management">権限管理</string>
+    <string name="permission_management_hint">各権限のスイッチを押すと、対応するシステムの許可/設定画面へ移動します。</string>
+    <string name="notification_permission_label">通知</string>
+    <string name="exact_alarm_permission_label">正確なアラーム</string>
+    <string name="full_screen_permission_label">全画面アラーム</string>
+    <string name="widget_timer_title">クイックタイマー</string>
+    <string name="widget_timer_description">ホーム画面から保存したタイマーをすぐ開始します。</string>
     <string name="no_logs">ログはありません。</string>
     <string name="no_logs_to_export">エクスポートするログがありません。</string>
     <string name="clear_logs">ログを消去</string>
@@ -95,5 +116,10 @@
     <string name="export_failed">ログのエクスポートに失敗しました。</string>
     <string name="log_hint_alarm_manager">AlarmManager 経路のログです。介入/確認/処理フローを確認してください。</string>
     <string name="log_hint_tick_loop">tick loop 経路のログです。</string>
+    <string name="press_back_again_to_exit">もう一度押すとアプリを終了します。</string>
+    <string name="options">オプション</string>
+    <string name="order">並び順</string>
+    <string name="order_done">完了</string>
+    <string name="full_screen_preview_button">全画面アラームをプレビュー</string>
     <string name="back">戻る</string>
 </resources>

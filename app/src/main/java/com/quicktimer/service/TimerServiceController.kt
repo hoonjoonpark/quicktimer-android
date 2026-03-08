@@ -25,7 +25,9 @@ object TimerServiceController {
     const val START_SOURCE_USER = "user_start"
     const val START_SOURCE_QUICK_ACTION = "quick_action"
     const val START_SOURCE_EXTEND = "extend_action"
+    const val START_SOURCE_WIDGET = "widget"
     const val START_SOURCE_UNKNOWN = "unknown"
+    const val COMPLETION_CHANNEL_ID = "quick_timer_completion_channel_v3"
 
     fun ensureService(context: Context) {
         val intent = Intent(context, TimerForegroundService::class.java)
@@ -39,12 +41,14 @@ object TimerServiceController {
         startSource: String = START_SOURCE_USER
     ) {
         if (durationSeconds <= 0) return
-        val intent = Intent(context, TimerForegroundService::class.java)
-            .setAction(ACTION_START)
-            .putExtra(EXTRA_DURATION_SECONDS, durationSeconds)
-            .putExtra(EXTRA_LABEL, label)
-            .putExtra(EXTRA_START_SOURCE, startSource)
-        context.startForegroundService(intent)
+        context.startForegroundService(
+            buildStartIntent(
+                context = context,
+                durationSeconds = durationSeconds,
+                label = label,
+                startSource = startSource
+            )
+        )
     }
 
     fun pause(context: Context, timerId: Int = 0) {
@@ -76,9 +80,67 @@ object TimerServiceController {
         context.startForegroundService(intent)
     }
 
+    fun extendFromAlarm(
+        context: Context,
+        durationSeconds: Int,
+        label: String,
+        sessionId: Long,
+        sessionStartedAtEpochMs: Long,
+        extensionCount: Int
+    ) {
+        if (durationSeconds <= 0 || sessionId <= 0L) return
+        context.startForegroundService(
+            buildStartIntent(
+                context = context,
+                durationSeconds = durationSeconds,
+                label = label,
+                startSource = START_SOURCE_EXTEND,
+                sessionId = sessionId,
+                sessionStartedAtEpochMs = sessionStartedAtEpochMs,
+                extensionCount = extensionCount
+            )
+        )
+    }
+
+    fun startFromWidget(
+        context: Context,
+        durationSeconds: Int,
+        label: String
+    ) {
+        startTimer(
+            context = context,
+            durationSeconds = durationSeconds,
+            label = label,
+            startSource = START_SOURCE_WIDGET
+        )
+    }
+
     fun acknowledgeAlarm(context: Context) {
         val intent = Intent(context, TimerForegroundService::class.java).setAction(ACTION_ACK_ALARM)
         runCatching { context.startService(intent) }
             .onFailure { context.startForegroundService(intent) }
+    }
+
+    private fun buildStartIntent(
+        context: Context,
+        durationSeconds: Int,
+        label: String,
+        startSource: String,
+        sessionId: Long = 0L,
+        sessionStartedAtEpochMs: Long = 0L,
+        extensionCount: Int = -1
+    ): Intent {
+        return Intent(context, TimerForegroundService::class.java)
+            .setAction(ACTION_START)
+            .putExtra(EXTRA_DURATION_SECONDS, durationSeconds)
+            .putExtra(EXTRA_LABEL, label)
+            .putExtra(EXTRA_START_SOURCE, startSource)
+            .apply {
+                if (sessionId > 0L) {
+                    putExtra(EXTRA_SESSION_ID, sessionId)
+                    putExtra(EXTRA_SESSION_STARTED_AT_MS, sessionStartedAtEpochMs)
+                    putExtra(EXTRA_EXTENSION_COUNT, extensionCount)
+                }
+            }
     }
 }

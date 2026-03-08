@@ -44,6 +44,8 @@
     <string name="notification_permission_primer_message">타이머 알림과 제어에 알림 권한이 필요합니다.</string>
     <string name="notification_permission_rationale_message">알림이 꺼져 있어 일부 기능이 동작하지 않습니다.</string>
     <string name="notification_permission_settings_message">권한이 차단되었습니다. 설정에서 알림을 켜주세요.</string>
+    <string name="exact_alarm_permission_required_title">정확 알람 권한</string>
+    <string name="exact_alarm_permission_message">타이머 완료 알림의 정확도를 위해 정확 알람 권한을 허용해 주세요.</string>
     <string name="notification_permission_continue">허용하기</string>
     <string name="notification_permission_retry">다시 요청</string>
     <string name="open_settings">설정 열기</string>
@@ -88,6 +90,25 @@
     <string name="runtime_debug_remaining">남음: %1$s</string>
     <string name="runtime_debug_total">전체: %1$s</string>
     <string name="runtime_debug_updated_elapsed">마지막 틱 elapsedRealtime: %1$d</string>
+    <string name="alarm_permission_flow">알람 권한</string>
+    <string name="exact_alarm_status">정확 알람: %1$s</string>
+    <string name="request_exact_alarm_permission">정확 알람 허용</string>
+    <string name="full_screen_intent_status">전체화면 알람: %1$s</string>
+    <string name="allow_full_screen_alarm">전체화면 알람 허용</string>
+    <string name="open_alarm_channel_settings">알람 채널 설정</string>
+    <string name="notification_channel_quick_name">퀵 타이머</string>
+    <string name="notification_channel_quick_description">빠른 실행 버튼</string>
+    <string name="notification_channel_running_name">실행 중 타이머</string>
+    <string name="notification_channel_running_description">카운트다운과 제어</string>
+    <string name="notification_channel_completion_name">타이머 완료</string>
+    <string name="notification_channel_completion_description">타이머 완료 알림</string>
+    <string name="permission_management">권한 관리</string>
+    <string name="permission_management_hint">각 권한 스위치를 누르면 해당 시스템 권한 요청/설정 화면으로 이동합니다.</string>
+    <string name="notification_permission_label">알림</string>
+    <string name="exact_alarm_permission_label">정확 알람</string>
+    <string name="full_screen_permission_label">전체화면 알람</string>
+    <string name="widget_timer_title">퀵 타이머</string>
+    <string name="widget_timer_description">홈 화면에서 저장한 타이머를 바로 시작합니다.</string>
     <string name="no_logs">로그가 없습니다.</string>
     <string name="no_logs_to_export">내보낼 로그가 없습니다.</string>
     <string name="clear_logs">로그 지우기</string>
@@ -95,5 +116,10 @@
     <string name="export_failed">로그 내보내기에 실패했습니다.</string>
     <string name="log_hint_alarm_manager">AlarmManager 경로 로그입니다. 개입/확인/처리 여부를 확인하세요.</string>
     <string name="log_hint_tick_loop">tick loop 경로 로그입니다.</string>
+    <string name="press_back_again_to_exit">한번 더 누르면 앱을 종료합니다.</string>
+    <string name="options">옵션</string>
+    <string name="order">순서</string>
+    <string name="order_done">완료</string>
+    <string name="full_screen_preview_button">풀스크린 화면 보기</string>
     <string name="back">뒤로가기</string>
 </resources>

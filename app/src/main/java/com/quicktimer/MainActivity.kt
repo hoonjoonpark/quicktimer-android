@@ -1,8 +1,10 @@
 package com.quicktimer
 
 import android.Manifest
+import android.app.AlarmManager
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -31,6 +33,7 @@ import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.quicktimer.ui.AppViewModel
 import com.quicktimer.ui.QuickTimerApp
 import com.quicktimer.ui.RunningTabNavigationRequest
+import com.quicktimer.data.AppThemeMode
 import com.quicktimer.ui.theme.QuickTimerTheme
 import com.quicktimer.service.TimerServiceController
 import kotlinx.coroutines.flow.first
@@ -51,6 +54,7 @@ class MainActivity : ComponentActivity() {
                 notificationDialog?.dismiss()
                 viewModel.ensureService()
                 TimerServiceController.refreshQuickActions(this)
+                maybeRequestExactAlarmPermission()
             } else {
                 handleNotificationPermissionDenied()
             }
@@ -59,12 +63,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        WindowCompat.getInsetsController(window, window.decorView).apply {
-            isAppearanceLightStatusBars = false
-            isAppearanceLightNavigationBars = false
-        }
 
         maybeRequestNotificationPermission()
+        maybeRequestExactAlarmPermission()
         viewModel.ensureService()
         TimerServiceController.refreshQuickActions(this)
         handleNotificationEntry(intent)
@@ -80,12 +81,23 @@ class MainActivity : ComponentActivity() {
                 }
                 AppCompatDelegate.setApplicationLocales(locales)
             }
+            LaunchedEffect(state.settings.themeMode) {
+                applySystemBarAppearance(state.settings.themeMode)
+            }
 
-            QuickTimerTheme(themeConfig = (application as QuickTimerApplication).themeConfig) {
+            QuickTimerTheme(
+                themeConfig = (application as QuickTimerApplication).themeConfig,
+                themeMode = state.settings.themeMode
+            ) {
                 QuickTimerApp(
                     viewModel = viewModel,
                     runningTabNavigationRequest = runningTabNavigationRequest,
-                    onRunningTabNavigationConsumed = { runningTabNavigationRequest = null }
+                    onRunningTabNavigationConsumed = { runningTabNavigationRequest = null },
+                    onRequestNotificationPermissionFlow = { maybeRequestNotificationPermission() },
+                    onOpenNotificationSettings = { openNotificationSettings() },
+                    onOpenExactAlarmSettings = { openExactAlarmSettings() },
+                    onOpenFullScreenIntentSettings = { openFullScreenIntentSettings() },
+                    onOpenAlarmChannelSettings = { openAlarmChannelSettings() }
                 )
             }
         }
@@ -110,11 +122,53 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun applySystemBarAppearance(themeMode: AppThemeMode) {
+        val isDark = when (themeMode) {
+            AppThemeMode.DARK -> true
+            AppThemeMode.LIGHT -> false
+            AppThemeMode.SYSTEM -> {
+                val uiMode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+                uiMode == Configuration.UI_MODE_NIGHT_YES
+            }
+        }
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = !isDark
+            isAppearanceLightNavigationBars = !isDark
+        }
+    }
+
+    private fun maybeRequestExactAlarmPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        if (!hasNotificationPermissionCompat()) return
+        val alarmManager = getSystemService(AlarmManager::class.java) ?: return
+        if (alarmManager.canScheduleExactAlarms()) return
+        val requestedBefore = permissionPrefs.getBoolean(KEY_EXACT_ALARM_REQUESTED, false)
+        if (requestedBefore) return
+
+        permissionPrefs.edit()
+            .putBoolean(KEY_EXACT_ALARM_REQUESTED, true)
+            .apply()
+        showNotificationDialog(
+            title = getString(R.string.exact_alarm_permission_required_title),
+            message = getString(R.string.exact_alarm_permission_message),
+            positiveLabel = getString(R.string.request_exact_alarm_permission),
+            onPositive = { openExactAlarmSettings() }
+        )
+    }
+
     private fun hasNotificationPermission(): Boolean {
         return ContextCompat.checkSelfPermission(
             this,
             Manifest.permission.POST_NOTIFICATIONS
         ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun hasNotificationPermissionCompat(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            hasNotificationPermission()
+        } else {
+            true
+        }
     }
 
     private fun markNotificationPermissionRequested() {
@@ -195,33 +249,82 @@ class MainActivity : ComponentActivity() {
             }
     }
 
+    private fun openExactAlarmSettings() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+            data = Uri.fromParts("package", packageName, null)
+        }
+        runCatching { startActivity(intent) }
+            .onFailure {
+                val fallbackIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", packageName, null)
+                }
+                startActivity(fallbackIntent)
+            }
+    }
+
+    private fun openFullScreenIntentSettings() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return
+        val intent = Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+            data = Uri.fromParts("package", packageName, null)
+        }
+        runCatching { startActivity(intent) }
+            .onFailure {
+                val fallbackIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", packageName, null)
+                }
+                startActivity(fallbackIntent)
+            }
+    }
+
+    private fun openAlarmChannelSettings() {
+        val intent = Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+            putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+            putExtra(Settings.EXTRA_CHANNEL_ID, TimerServiceController.COMPLETION_CHANNEL_ID)
+        }
+        runCatching { startActivity(intent) }
+            .onFailure {
+                val fallbackIntent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                    putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                }
+                startActivity(fallbackIntent)
+            }
+    }
+
     private fun handleNotificationEntry(intent: Intent?) {
         val fromAlarm = intent?.getBooleanExtra(EXTRA_FROM_ALARM, false) == true
         val fromRunningNotification = intent?.getBooleanExtra(EXTRA_FROM_RUNNING_NOTIFICATION, false) == true
         val fromNotification = intent?.getBooleanExtra(EXTRA_FROM_NOTIFICATION, false) == true
-        if (fromAlarm) {
-            TimerServiceController.acknowledgeAlarm(this)
-            intent?.removeExtra(EXTRA_FROM_ALARM)
-            if (fromNotification) {
-                intent?.removeExtra(EXTRA_FROM_NOTIFICATION)
+        when {
+            fromAlarm -> {
+                TimerServiceController.acknowledgeAlarm(this)
+                clearNotificationExtras(intent)
+                if (fromNotification) {
+                    maybeShowInterstitialAd()
+                }
+            }
+
+            fromRunningNotification -> {
+                val targetTimerId = intent?.getIntExtra(EXTRA_TARGET_TIMER_ID, 0) ?: 0
+                runningTabNavigationRequest = RunningTabNavigationRequest(
+                    requestId = System.currentTimeMillis(),
+                    targetTimerId = targetTimerId
+                )
+                clearNotificationExtras(intent)
+            }
+
+            fromNotification -> {
+                clearNotificationExtras(intent)
                 maybeShowInterstitialAd()
             }
-            return
         }
-        if (fromRunningNotification) {
-            val targetTimerId = intent?.getIntExtra(EXTRA_TARGET_TIMER_ID, 0) ?: 0
-            runningTabNavigationRequest = RunningTabNavigationRequest(
-                requestId = System.currentTimeMillis(),
-                targetTimerId = targetTimerId
-            )
-            intent?.removeExtra(EXTRA_FROM_RUNNING_NOTIFICATION)
-            intent?.removeExtra(EXTRA_TARGET_TIMER_ID)
-            intent?.removeExtra(EXTRA_FROM_NOTIFICATION)
-            return
-        }
-        if (!fromNotification) return
+    }
+
+    private fun clearNotificationExtras(intent: Intent?) {
+        intent?.removeExtra(EXTRA_FROM_ALARM)
+        intent?.removeExtra(EXTRA_FROM_RUNNING_NOTIFICATION)
         intent?.removeExtra(EXTRA_FROM_NOTIFICATION)
-        maybeShowInterstitialAd()
+        intent?.removeExtra(EXTRA_TARGET_TIMER_ID)
     }
 
     private fun maybeShowInterstitialAd() {
@@ -263,5 +366,6 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_FROM_RUNNING_NOTIFICATION = "from_running_notification"
         const val EXTRA_TARGET_TIMER_ID = "target_timer_id"
         private const val KEY_POST_NOTIFICATIONS_REQUESTED = "post_notifications_requested"
+        private const val KEY_EXACT_ALARM_REQUESTED = "exact_alarm_requested"
     }
 }

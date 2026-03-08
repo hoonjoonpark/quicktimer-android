@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.quicktimer.QuickTimerApplication
+import com.quicktimer.data.AppThemeMode
 import com.quicktimer.data.AppSettings
 import com.quicktimer.data.FontSize
 import com.quicktimer.data.TimerHistory
@@ -139,6 +140,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setFontSize(fontSize: FontSize) {
         viewModelScope.launch { app.settingsStore.setFontSize(fontSize) }
+    }
+
+    fun setThemeMode(themeMode: AppThemeMode) {
+        viewModelScope.launch { app.settingsStore.setThemeMode(themeMode) }
     }
 
     fun setAdsRemoved(removed: Boolean) {

@@ -3,4 +3,24 @@
     <style name="Theme.QuickTimer" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="android:windowBackground">@color/app_background_dark</item>
     </style>
+
+    <style name="ThemeOverlay.QuickTimer.NumberPicker.Light" parent="">
+        <item name="android:numberPickerStyle">@style/Widget.QuickTimer.NumberPicker.Light</item>
+        <item name="android:textColorPrimary">@color/number_picker_text_light</item>
+        <item name="android:textColorSecondary">@color/number_picker_text_light</item>
+    </style>
+
+    <style name="ThemeOverlay.QuickTimer.NumberPicker.Dark" parent="">
+        <item name="android:numberPickerStyle">@style/Widget.QuickTimer.NumberPicker.Dark</item>
+        <item name="android:textColorPrimary">@color/number_picker_text_dark</item>
+        <item name="android:textColorSecondary">@color/number_picker_text_dark</item>
+    </style>
+
+    <style name="Widget.QuickTimer.NumberPicker.Light" parent="@android:style/Widget.Material.NumberPicker">
+        <item name="android:textColor">@color/number_picker_text_light</item>
+    </style>
+
+    <style name="Widget.QuickTimer.NumberPicker.Dark" parent="@android:style/Widget.Material.NumberPicker">
+        <item name="android:textColor">@color/number_picker_text_dark</item>
+    </style>
 </resources>

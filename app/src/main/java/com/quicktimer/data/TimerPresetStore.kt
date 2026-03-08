@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.quicktimer.widget.TimerPresetWidgetProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -69,6 +70,7 @@ class TimerPresetStore(
         migrationPrefs.edit()
             .putBoolean(KEY_USER_CLEARED_ALL, false)
             .apply()
+        TimerPresetWidgetProvider.notifyDataChanged(context)
     }
 
     suspend fun removePreset(id: Long) {
@@ -81,6 +83,7 @@ class TimerPresetStore(
                 .putBoolean(KEY_USER_CLEARED_ALL, true)
                 .apply()
         }
+        TimerPresetWidgetProvider.notifyDataChanged(context)
     }
 
     suspend fun updatePreset(id: Long, durationSeconds: Int, label: String) {
@@ -97,6 +100,7 @@ class TimerPresetStore(
                 }
             }.reindexed()
         )
+        TimerPresetWidgetProvider.notifyDataChanged(context)
     }
 
     suspend fun movePreset(fromIndex: Int, toIndex: Int) {
@@ -106,6 +110,7 @@ class TimerPresetStore(
         val item = current.removeAt(fromIndex)
         current.add(toIndex, item)
         dao.replaceAll(current.reindexed())
+        TimerPresetWidgetProvider.notifyDataChanged(context)
     }
 
     suspend fun reorderPresets(orderedIds: List<Long>) {
@@ -118,6 +123,7 @@ class TimerPresetStore(
         }
         reordered.addAll(current.filter { byId.containsKey(it.id) })
         dao.replaceAll(reordered.reindexed())
+        TimerPresetWidgetProvider.notifyDataChanged(context)
     }
 
     private suspend fun migrateLegacyIfNeeded() {
@@ -149,6 +155,7 @@ class TimerPresetStore(
         val userClearedAll = migrationPrefs.getBoolean(KEY_USER_CLEARED_ALL, false)
         if (dao.count() == 0 && !userClearedAll) {
             dao.replaceAll(defaultPresetEntities())
+            TimerPresetWidgetProvider.notifyDataChanged(context)
         }
     }
 

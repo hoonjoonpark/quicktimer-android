@@ -44,6 +44,8 @@
     <string name="notification_permission_primer_message">Notifications are required for timer alerts and controls.</string>
     <string name="notification_permission_rationale_message">Notifications are off. Some timer features will not work.</string>
     <string name="notification_permission_settings_message">Permission is blocked. Turn on notifications in Settings.</string>
+    <string name="exact_alarm_permission_required_title">Exact alarm permission</string>
+    <string name="exact_alarm_permission_message">Allow exact alarms for more reliable timer completion alerts.</string>
     <string name="notification_permission_continue">Allow now</string>
     <string name="notification_permission_retry">Try again</string>
     <string name="open_settings">Open settings</string>
@@ -88,6 +90,25 @@
     <string name="runtime_debug_remaining">Remaining: %1$s</string>
     <string name="runtime_debug_total">Total: %1$s</string>
     <string name="runtime_debug_updated_elapsed">Last tick elapsedRealtime: %1$d</string>
+    <string name="alarm_permission_flow">Alarm permissions</string>
+    <string name="exact_alarm_status">Exact alarm: %1$s</string>
+    <string name="request_exact_alarm_permission">Allow exact alarms</string>
+    <string name="full_screen_intent_status">Full-screen alarm: %1$s</string>
+    <string name="allow_full_screen_alarm">Allow full-screen alarm</string>
+    <string name="open_alarm_channel_settings">Alarm channel settings</string>
+    <string name="notification_channel_quick_name">Quick timer</string>
+    <string name="notification_channel_quick_description">Quick action buttons</string>
+    <string name="notification_channel_running_name">Running timer</string>
+    <string name="notification_channel_running_description">Running countdown and controls</string>
+    <string name="notification_channel_completion_name">Timer complete</string>
+    <string name="notification_channel_completion_description">Timer completion alert</string>
+    <string name="permission_management">Permission management</string>
+    <string name="permission_management_hint">Toggle each permission to open the matching system request/settings flow.</string>
+    <string name="notification_permission_label">Notifications</string>
+    <string name="exact_alarm_permission_label">Exact alarms</string>
+    <string name="full_screen_permission_label">Full-screen alarms</string>
+    <string name="widget_timer_title">Quick Timers</string>
+    <string name="widget_timer_description">Start your saved timers from the home screen.</string>
     <string name="no_logs">No logs yet.</string>
     <string name="no_logs_to_export">No logs to export.</string>
     <string name="clear_logs">Clear logs</string>
@@ -95,5 +116,10 @@
     <string name="export_failed">Failed to export logs.</string>
     <string name="log_hint_alarm_manager">AlarmManager-path log. Check intervention/verification/handling flow.</string>
     <string name="log_hint_tick_loop">Tick-loop-path log.</string>
+    <string name="press_back_again_to_exit">Press back again to exit.</string>
+    <string name="options">Options</string>
+    <string name="order">Order</string>
+    <string name="order_done">Done</string>
+    <string name="full_screen_preview_button">Preview full-screen alarm</string>
     <string name="back">Back</string>
 </resources>
