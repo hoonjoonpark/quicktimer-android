@@ -71,23 +71,23 @@ class MainActivity : ComponentActivity() {
         handleNotificationEntry(intent)
 
         setContent {
-            val state by viewModel.uiState.collectAsStateWithLifecycle()
+            val settings by viewModel.settingsState.collectAsStateWithLifecycle()
 
-            LaunchedEffect(state.settings.languageTag) {
-                val locales = if (state.settings.languageTag == "system") {
+            LaunchedEffect(settings.languageTag) {
+                val locales = if (settings.languageTag == "system") {
                     LocaleListCompat.getEmptyLocaleList()
                 } else {
-                    LocaleListCompat.forLanguageTags(state.settings.languageTag)
+                    LocaleListCompat.forLanguageTags(settings.languageTag)
                 }
                 AppCompatDelegate.setApplicationLocales(locales)
             }
-            LaunchedEffect(state.settings.themeMode) {
-                applySystemBarAppearance(state.settings.themeMode)
+            LaunchedEffect(settings.themeMode) {
+                applySystemBarAppearance(settings.themeMode)
             }
 
             QuickTimerTheme(
                 themeConfig = (application as QuickTimerApplication).themeConfig,
-                themeMode = state.settings.themeMode
+                themeMode = settings.themeMode
             ) {
                 QuickTimerApp(
                     viewModel = viewModel,

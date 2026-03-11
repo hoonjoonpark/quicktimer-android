@@ -216,13 +216,19 @@ fun LogsScreen(
                 items(logs) { line ->
                     val isAlarmManager = line.contains("[ALARM_MANAGER]")
                     val isTickLoop = line.contains("[TICK_LOOP]")
+                    val isRefreshLoop = line.contains("[REFRESH_LOOP]")
+                    val isPowerState = line.contains("POWER[")
                     val containerColor = when {
                         isAlarmManager -> MaterialTheme.colorScheme.primaryContainer
+                        isPowerState -> MaterialTheme.colorScheme.errorContainer
+                        isRefreshLoop -> MaterialTheme.colorScheme.tertiaryContainer
                         isTickLoop -> MaterialTheme.colorScheme.tertiaryContainer
                         else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
                     }
                     val contentColor = when {
                         isAlarmManager -> MaterialTheme.colorScheme.onPrimaryContainer
+                        isPowerState -> MaterialTheme.colorScheme.onErrorContainer
+                        isRefreshLoop -> MaterialTheme.colorScheme.onTertiaryContainer
                         isTickLoop -> MaterialTheme.colorScheme.onTertiaryContainer
                         else -> MaterialTheme.colorScheme.onSurfaceVariant
                     }
@@ -237,18 +243,24 @@ fun LogsScreen(
                                 .padding(horizontal = 10.dp, vertical = 8.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            if (isAlarmManager || isTickLoop) {
+                            if (isAlarmManager || isTickLoop || isRefreshLoop || isPowerState) {
                                 Text(
-                                    text = if (isAlarmManager) "ALARM_MANAGER" else "TICK_LOOP",
+                                    text = when {
+                                        isAlarmManager -> "ALARM_MANAGER"
+                                        isPowerState -> "POWER_STATE"
+                                        isRefreshLoop -> "REFRESH_LOOP"
+                                        else -> "TICK_LOOP"
+                                    },
                                     fontSize = (10 * fontScale).sp,
                                     fontWeight = FontWeight.Bold,
                                     color = contentColor
                                 )
                                 Text(
-                                    text = if (isAlarmManager) {
-                                        stringResource(R.string.log_hint_alarm_manager)
-                                    } else {
-                                        stringResource(R.string.log_hint_tick_loop)
+                                    text = when {
+                                        isAlarmManager -> stringResource(R.string.log_hint_alarm_manager)
+                                        isPowerState -> stringResource(R.string.log_hint_power_state)
+                                        isRefreshLoop -> stringResource(R.string.log_hint_refresh_loop)
+                                        else -> stringResource(R.string.log_hint_tick_loop)
                                     },
                                     fontSize = (11 * fontScale).sp,
                                     color = contentColor
@@ -318,14 +330,7 @@ private fun csvEscape(value: String): String {
 fun sortedByExpectedFinish(timers: List<ActiveTimerState>): List<ActiveTimerState> {
     return timers.sortedWith(
         compareBy<ActiveTimerState>(
-            { if (it.isPaused) 1 else 0 },
-            {
-                if (it.isPaused) {
-                    it.remainingMillis
-                } else {
-                    it.updatedAtElapsedMs + it.remainingMillis
-                }
-            }
+            { it.remainingMillis }
         ).thenBy { it.id }
     )
 }

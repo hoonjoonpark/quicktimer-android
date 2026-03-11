@@ -20,7 +20,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -69,7 +72,11 @@ fun AddTimerBottomSheet(
     var minutes by remember(initialDurationSeconds) { mutableIntStateOf(((initialDurationSeconds % 3600) / 60).coerceIn(0, 59)) }
     var seconds by remember(initialDurationSeconds) { mutableIntStateOf((initialDurationSeconds % 60).coerceIn(0, 59)) }
     var label by remember(initialLabel) { mutableStateOf(initialLabel) }
-    val contentBottomPadding = 12.dp + (bottomOffset * 0.28f)
+    val density = LocalDensity.current
+    val imeBottomPx = WindowInsets.ime.getBottom(density)
+    val imeBottomDp = with(density) { imeBottomPx.toDp() }
+    val baseContentBottomPadding = 12.dp + (bottomOffset * 0.28f)
+    val contentBottomPadding = (baseContentBottomPadding - (imeBottomDp * 0.12f)).coerceAtLeast(8.dp)
     val hideDurationMs = 220L
     val scope = rememberCoroutineScope()
     var isVisible by remember { mutableStateOf(true) }
@@ -118,6 +125,7 @@ fun AddTimerBottomSheet(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .imePadding()
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -202,7 +210,7 @@ fun AddTimerBottomSheet(
                             Text(stringResource(R.string.save))
                         }
                     }
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(2.dp))
                 }
             }
         }

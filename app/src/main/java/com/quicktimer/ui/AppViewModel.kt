@@ -14,17 +14,8 @@ import com.quicktimer.service.TimerRuntimeState
 import com.quicktimer.service.TimerServiceController
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-
-data class AppUiState(
-    val presets: List<TimerPreset> = emptyList(),
-    val history: List<TimerHistory> = emptyList(),
-    val settings: AppSettings = AppSettings(),
-    val runningTimer: RunningTimerState = RunningTimerState(),
-    val logs: List<String> = emptyList()
-)
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application as QuickTimerApplication
@@ -35,24 +26,34 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    val uiState: StateFlow<AppUiState> = combine(
-        app.presetStore.presetsFlow,
-        app.historyStore.historyFlow,
-        app.settingsStore.settingsFlow,
-        TimerRuntimeState.state,
-        app.logStore.logsFlow
-    ) { presets, history, settings, runningTimer, logs ->
-        AppUiState(
-            presets = presets,
-            history = history,
-            settings = settings,
-            runningTimer = runningTimer,
-            logs = logs
-        )
-    }.stateIn(
+    val presetsState: StateFlow<List<TimerPreset>> = app.presetStore.presetsFlow.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
-        initialValue = AppUiState()
+        initialValue = emptyList()
+    )
+
+    val historyState: StateFlow<List<TimerHistory>> = app.historyStore.historyFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
+    val settingsState: StateFlow<AppSettings> = app.settingsStore.settingsFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = AppSettings()
+    )
+
+    val runningTimerState: StateFlow<RunningTimerState> = TimerRuntimeState.state.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = RunningTimerState()
+    )
+
+    val logsState: StateFlow<List<String>> = app.logStore.logsFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
     )
 
     fun ensureService() {
@@ -117,13 +118,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun clearAllHistory() {
         viewModelScope.launch {
             app.historyStore.clearAllHistory()
-        }
-    }
-
-    fun movePreset(fromIndex: Int, toIndex: Int) {
-        viewModelScope.launch {
-            app.presetStore.movePreset(fromIndex, toIndex)
-            TimerServiceController.refreshQuickActions(getApplication())
         }
     }
 

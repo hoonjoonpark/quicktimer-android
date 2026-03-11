@@ -116,6 +116,8 @@
     <string name="export_failed">로그 내보내기에 실패했습니다.</string>
     <string name="log_hint_alarm_manager">AlarmManager 경로 로그입니다. 개입/확인/처리 여부를 확인하세요.</string>
     <string name="log_hint_tick_loop">tick loop 경로 로그입니다.</string>
+    <string name="log_hint_refresh_loop">실행중 알림 갱신 루프 tick 로그입니다.</string>
+    <string name="log_hint_power_state">화면/전원 전환(수면/깨움/인터랙티브) 로그입니다.</string>
     <string name="press_back_again_to_exit">한번 더 누르면 앱을 종료합니다.</string>
     <string name="options">옵션</string>
     <string name="order">순서</string>

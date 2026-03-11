@@ -103,16 +103,6 @@ class TimerPresetStore(
         TimerPresetWidgetProvider.notifyDataChanged(context)
     }
 
-    suspend fun movePreset(fromIndex: Int, toIndex: Int) {
-        awaitMigration()
-        val current = dao.getAll().toMutableList()
-        if (fromIndex !in current.indices || toIndex !in current.indices) return
-        val item = current.removeAt(fromIndex)
-        current.add(toIndex, item)
-        dao.replaceAll(current.reindexed())
-        TimerPresetWidgetProvider.notifyDataChanged(context)
-    }
-
     suspend fun reorderPresets(orderedIds: List<Long>) {
         awaitMigration()
         val current = dao.getAll()

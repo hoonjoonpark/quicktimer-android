@@ -39,13 +39,14 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.quicktimer.R
+import com.quicktimer.data.AppSettings
 import com.quicktimer.data.AppThemeMode
 import com.quicktimer.data.FontSize
 
 @Composable
 fun SettingsTab(
     modifier: Modifier,
-    state: AppUiState,
+    settings: AppSettings,
     onLanguage: (String) -> Unit,
     onThemeMode: (AppThemeMode) -> Unit,
     onFontSize: (FontSize) -> Unit,
@@ -86,10 +87,10 @@ fun SettingsTab(
             Text(stringResource(R.string.language), fontSize = (18 * fontScale).sp, fontWeight = FontWeight.SemiBold)
             Spacer(modifier = Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                LanguageChip("system", state.settings.languageTag, "System", onLanguage, fontScale)
-                LanguageChip("ko", state.settings.languageTag, "한국어", onLanguage, fontScale)
-                LanguageChip("en", state.settings.languageTag, "English", onLanguage, fontScale)
-                LanguageChip("ja", state.settings.languageTag, "日本語", onLanguage, fontScale)
+                LanguageChip("system", settings.languageTag, "System", onLanguage, fontScale)
+                LanguageChip("ko", settings.languageTag, "한국어", onLanguage, fontScale)
+                LanguageChip("en", settings.languageTag, "English", onLanguage, fontScale)
+                LanguageChip("ja", settings.languageTag, "日本語", onLanguage, fontScale)
             }
         }
 
@@ -101,7 +102,7 @@ fun SettingsTab(
                     SegmentedButton(
                         shape = SegmentedButtonDefaults.itemShape(index = index, count = 3),
                         colors = segmentedColors,
-                        selected = state.settings.themeMode == mode,
+                        selected = settings.themeMode == mode,
                         onClick = { onThemeMode(mode) },
                         label = {
                             Text(
@@ -126,7 +127,7 @@ fun SettingsTab(
                     SegmentedButton(
                         shape = SegmentedButtonDefaults.itemShape(index = index, count = 3),
                         colors = segmentedColors,
-                        selected = state.settings.fontSize == size,
+                        selected = settings.fontSize == size,
                         onClick = { onFontSize(size) },
                         label = {
                             Text(
@@ -154,7 +155,7 @@ fun SettingsTab(
                     Text(stringResource(R.string.simulate_purchase_hint), fontSize = (13 * fontScale).sp)
                 }
                 Switch(
-                    checked = state.settings.adsRemoved,
+                    checked = settings.adsRemoved,
                     onCheckedChange = onAdsRemoved,
                     colors = settingSwitchColors
                 )
@@ -179,7 +180,7 @@ fun SettingsTab(
                     )
                 }
                 Switch(
-                    checked = state.settings.delayIntervention,
+                    checked = settings.delayIntervention,
                     onCheckedChange = onDelayIntervention,
                     colors = settingSwitchColors
                 )
@@ -204,7 +205,7 @@ fun SettingsTab(
                     )
                 }
                 Switch(
-                    checked = state.settings.alarmSoundEnabled,
+                    checked = settings.alarmSoundEnabled,
                     onCheckedChange = onAlarmSoundEnabled,
                     colors = settingSwitchColors
                 )
@@ -229,7 +230,7 @@ fun SettingsTab(
                     )
                 }
                 Switch(
-                    checked = state.settings.alarmVibrationEnabled,
+                    checked = settings.alarmVibrationEnabled,
                     onCheckedChange = onAlarmVibrationEnabled,
                     colors = settingSwitchColors
                 )

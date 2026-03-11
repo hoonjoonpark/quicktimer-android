@@ -116,6 +116,8 @@
     <string name="export_failed">Failed to export logs.</string>
     <string name="log_hint_alarm_manager">AlarmManager-path log. Check intervention/verification/handling flow.</string>
     <string name="log_hint_tick_loop">Tick-loop-path log.</string>
+    <string name="log_hint_refresh_loop">Running-notification refresh loop tick log.</string>
+    <string name="log_hint_power_state">Screen/power transition log (sleep/wake/interactive state).</string>
     <string name="press_back_again_to_exit">Press back again to exit.</string>
     <string name="options">Options</string>
     <string name="order">Order</string>

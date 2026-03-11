@@ -116,6 +116,8 @@
     <string name="export_failed">ログのエクスポートに失敗しました。</string>
     <string name="log_hint_alarm_manager">AlarmManager 経路のログです。介入/確認/処理フローを確認してください。</string>
     <string name="log_hint_tick_loop">tick loop 経路のログです。</string>
+    <string name="log_hint_refresh_loop">実行中通知の更新ループ tick ログです。</string>
+    <string name="log_hint_power_state">画面/電源遷移（スリープ/復帰/インタラクティブ）ログです。</string>
     <string name="press_back_again_to_exit">もう一度押すとアプリを終了します。</string>
     <string name="options">オプション</string>
     <string name="order">並び順</string>

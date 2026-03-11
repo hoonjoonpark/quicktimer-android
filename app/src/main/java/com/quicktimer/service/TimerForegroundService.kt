@@ -9,13 +9,16 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.media.AudioAttributes
 import android.media.Ringtone
 import android.media.RingtoneManager
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -44,6 +47,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.math.max
 
@@ -82,7 +86,6 @@ class TimerForegroundService : Service() {
     )
 
     private enum class CompletionTrigger(val tag: String) {
-        TICK_LOOP("TICK_LOOP"),
         ALARM_MANAGER("ALARM_MANAGER")
     }
 
@@ -91,8 +94,6 @@ class TimerForegroundService : Service() {
     )
 
     private var presets: List<TimerPreset> = defaultPresets()
-    private var tickerJob: Job? = null
-
     private val timers = mutableListOf<TimerEntry>()
     private var nextTimerId = 1
     private var nextSessionId = 1L
@@ -110,13 +111,22 @@ class TimerForegroundService : Service() {
     private lateinit var logStore: LogStore
     private lateinit var runningTimerStore: RunningTimerStore
     private lateinit var historyStore: TimerHistoryStore
-    private var restoreJob: Job? = null
+    private var restoreJob: kotlinx.coroutines.Job? = null
+    private var runningNotificationRefreshJob: Job? = null
+    private val interactiveStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context?, intent: Intent?) {
+            val action = intent?.action.orEmpty()
+            logEvent("POWER[$action] ${powerStateSummary()}")
+            restartRunningNotificationRefreshLoop()
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
         createChannels()
         clearStaleNotifications()
         startForeground(QUICK_NOTIFICATION_ID, buildQuickNotification())
+        registerInteractiveStateReceiver()
 
         val app = application as QuickTimerApplication
         logStore = app.logStore
@@ -180,7 +190,19 @@ class TimerForegroundService : Service() {
                         0L
                     )
                     val extensionCount = intent.getIntExtra(TimerServiceController.EXTRA_EXTENSION_COUNT, -1)
+                    if (source == TimerServiceController.START_SOURCE_EXTEND) {
+                        val accepted = consumeActiveCompletionForExtend(
+                            sessionIdHint = sessionId,
+                            sessionStartedAtHint = sessionStartedAt,
+                            extensionCountHint = extensionCount
+                        )
+                        if (!accepted) {
+                            syncNotifications()
+                            return@launch
+                        }
+                    }
                     stopCompletionAlert()
+                    NotificationManagerCompat.from(this@TimerForegroundService).cancel(COMPLETION_NOTIFICATION_ID)
                     startTimer(
                         durationSeconds = duration,
                         label = label,
@@ -195,25 +217,21 @@ class TimerForegroundService : Service() {
 
                 TimerServiceController.ACTION_PAUSE -> {
                     val timerId = intent.getIntExtra(TimerServiceController.EXTRA_TIMER_ID, 0)
-                    logEvent("PAUSE request timerId=$timerId")
                     pauseTimer(timerId)
                 }
 
                 TimerServiceController.ACTION_RESUME -> {
                     val timerId = intent.getIntExtra(TimerServiceController.EXTRA_TIMER_ID, 0)
-                    logEvent("RESUME request timerId=$timerId")
                     resumeTimer(timerId)
                 }
 
                 TimerServiceController.ACTION_STOP -> {
                     val timerId = intent.getIntExtra(TimerServiceController.EXTRA_TIMER_ID, 0)
-                    logEvent("STOP request timerId=$timerId")
                     stopTimer(timerId)
                 }
 
                 TimerServiceController.ACTION_LAP -> {
                     val timerId = intent.getIntExtra(TimerServiceController.EXTRA_TIMER_ID, 0)
-                    logEvent("LAP request timerId=$timerId")
                     recordLap(timerId)
                 }
                 TimerServiceController.ACTION_REFRESH -> {
@@ -230,7 +248,8 @@ class TimerForegroundService : Service() {
 
     override fun onDestroy() {
         restoreJob?.cancel()
-        tickerJob?.cancel()
+        runningNotificationRefreshJob?.cancel()
+        unregisterInteractiveStateReceiver()
         cancelExactWake()
         stopCompletionAlert()
         serviceScope.cancel()
@@ -307,9 +326,6 @@ class TimerForegroundService : Service() {
 
         val changed = tickTimers(CompletionTrigger.ALARM_MANAGER)
         if (changed) persistTimers()
-        if (timers.any { !it.isPaused }) {
-            ensureTicker(reschedule = true)
-        }
         publishState()
         syncNotifications()
     }
@@ -393,7 +409,6 @@ class TimerForegroundService : Service() {
             )
         )
         persistTimers()
-        ensureTicker(reschedule = true)
         publishState()
         syncNotifications()
         if (source == TimerServiceController.START_SOURCE_WIDGET) {
@@ -408,10 +423,6 @@ class TimerForegroundService : Service() {
         tickOne(timer, now)
         timer.isPaused = true
         timer.updatedAtElapsedMs = now
-        if (timers.none { !it.isPaused }) {
-            tickerJob?.cancel()
-            tickerJob = null
-        }
         persistTimers()
         publishState()
         syncNotifications()
@@ -423,7 +434,6 @@ class TimerForegroundService : Service() {
         timer.isPaused = false
         timer.updatedAtElapsedMs = SystemClock.elapsedRealtime()
         persistTimers()
-        ensureTicker(reschedule = true)
         publishState()
         syncNotifications()
     }
@@ -440,10 +450,6 @@ class TimerForegroundService : Service() {
             status = TimerHistoryStatus.STOPPED
         )
         timers.removeAt(targetIndex)
-        if (timers.none { !it.isPaused }) {
-            tickerJob?.cancel()
-            tickerJob = null
-        }
         if (timers.isEmpty()) stopCompletionAlert()
         persistTimers()
         publishState()
@@ -453,8 +459,8 @@ class TimerForegroundService : Service() {
     private suspend fun recordLap(timerId: Int) {
         val timer = resolveTimer(timerId) ?: return
         if (timer.isPaused) return
-        tickOne(timer, SystemClock.elapsedRealtime())
-        val lapValue = formatDurationMillis(timer.remainingMillis)
+        val now = SystemClock.elapsedRealtime()
+        val lapValue = formatDurationMillis(currentRemainingMillis(timer, now))
         val previousLap = timer.laps.firstOrNull()
         if (previousLap == lapValue) return
         timer.laps.add(0, lapValue)
@@ -462,32 +468,6 @@ class TimerForegroundService : Service() {
         persistTimers()
         publishState()
         syncNotifications()
-    }
-
-    private fun ensureTicker(reschedule: Boolean = false) {
-        if (reschedule && tickerJob?.isActive == true) {
-            tickerJob?.cancel()
-            tickerJob = null
-        }
-        if (tickerJob?.isActive == true) return
-        if (timers.none { !it.isPaused }) return
-        tickerJob = serviceScope.launch {
-            var nextTick = SystemClock.elapsedRealtime() + 1000L
-            while (timers.any { !it.isPaused }) {
-                val now = SystemClock.elapsedRealtime()
-                val sleepMs = (nextTick - now).coerceAtLeast(1L)
-                delay(sleepMs)
-                val changed = tickTimers(CompletionTrigger.TICK_LOOP)
-                if (changed) persistTimers()
-                publishState()
-                syncNotifications()
-                val afterTick = SystemClock.elapsedRealtime()
-                do {
-                    nextTick += 1000L
-                } while (nextTick <= afterTick)
-            }
-            tickerJob = null
-        }
     }
 
     private suspend fun tickTimers(trigger: CompletionTrigger): Boolean {
@@ -499,20 +479,22 @@ class TimerForegroundService : Service() {
         val iterator = timers.iterator()
         while (iterator.hasNext()) {
             val timer = iterator.next()
-            tickOne(timer, now)
-            if (timer.remainingMillis <= 0L) {
-                if (trigger == CompletionTrigger.TICK_LOOP && delayInterventionEnabled) {
+            val remainingNow = currentRemainingMillis(timer, now)
+            if (remainingNow <= 0L) {
+                if (trigger == CompletionTrigger.ALARM_MANAGER && delayInterventionEnabled) {
                     if (!timer.deferredByDelayMode) {
                         timer.deferredByDelayMode = true
                         timer.deferredWakeElapsedMs = now + DELAY_SIMULATION_WAKE_MS
                         stateChanged = true
                         logEvent(
-                            "DELAY_SIM[TICK_LOOP] defer completion to ALARM_MANAGER " +
+                            "DELAY_SIM[ALARM_MANAGER] defer completion " +
                                 "${displayLabel((timer.totalMillis / 1000L).toInt(), timer.label)}"
                         )
                     }
                     continue
                 }
+                timer.remainingMillis = 0L
+                timer.updatedAtElapsedMs = now
                 if (completedSpec == null) {
                     completedSpec = CompletedTimerSpec(
                         durationSeconds = (timer.totalMillis / 1000L).toInt(),
@@ -570,6 +552,46 @@ class TimerForegroundService : Service() {
         return stateChanged
     }
 
+    private fun consumeActiveCompletionForExtend(
+        sessionIdHint: Long,
+        sessionStartedAtHint: Long,
+        extensionCountHint: Int
+    ): Boolean {
+        if (!completionAlertActive) {
+            logEvent("ALARM_EXTEND ignore reason=not_ringing sessionId=$sessionIdHint")
+            return false
+        }
+        val activeSpec = lastCompletedSpec
+        if (activeSpec == null) {
+            logEvent("ALARM_EXTEND ignore reason=no_active_spec sessionId=$sessionIdHint")
+            return false
+        }
+        if (sessionIdHint <= 0L || sessionIdHint != activeSpec.sessionId) {
+            logEvent(
+                "ALARM_EXTEND ignore reason=session_mismatch active=${activeSpec.sessionId} req=$sessionIdHint"
+            )
+            return false
+        }
+        if (
+            activeSpec.sessionStartedAtEpochMs > 0L &&
+            sessionStartedAtHint > 0L &&
+            sessionStartedAtHint != activeSpec.sessionStartedAtEpochMs
+        ) {
+            logEvent(
+                "ALARM_EXTEND ignore reason=start_mismatch active=${activeSpec.sessionStartedAtEpochMs} req=$sessionStartedAtHint"
+            )
+            return false
+        }
+        if (extensionCountHint >= 0 && extensionCountHint != activeSpec.extensionCount) {
+            logEvent(
+                "ALARM_EXTEND ignore reason=stale_extension active=${activeSpec.extensionCount} req=$extensionCountHint"
+            )
+            return false
+        }
+        logEvent("ALARM_EXTEND accept sessionId=${activeSpec.sessionId} extension=${activeSpec.extensionCount}")
+        return true
+    }
+
     private suspend fun recordHistory(
         timer: TimerEntry,
         endedAtEpochMs: Long,
@@ -589,10 +611,13 @@ class TimerForegroundService : Service() {
 
     private fun tickOne(timer: TimerEntry, now: Long) {
         if (timer.isPaused) return
-        val delta = (now - timer.updatedAtElapsedMs).coerceAtLeast(0L)
-        if (delta <= 0L) return
-        timer.remainingMillis = max(0L, timer.remainingMillis - delta)
+        timer.remainingMillis = currentRemainingMillis(timer, now)
         timer.updatedAtElapsedMs = now
+    }
+
+    private fun currentRemainingMillis(timer: TimerEntry, nowElapsedMs: Long): Long {
+        if (timer.isPaused) return timer.remainingMillis.coerceAtLeast(0L)
+        return (expectedWakeElapsedMs(timer) - nowElapsedMs).coerceAtLeast(0L)
     }
 
     private fun resolveTimer(timerId: Int): TimerEntry? {
@@ -641,10 +666,11 @@ class TimerForegroundService : Service() {
         }.getOrDefault(true)
         val primary = selectSoonestTimer()
         val active = timers.map { timer ->
+            val remainingNow = currentRemainingMillis(timer, nowElapsed)
             ActiveTimerState(
                 id = timer.id,
                 totalMillis = timer.totalMillis,
-                remainingMillis = timer.remainingMillis,
+                remainingMillis = remainingNow,
                 label = timer.label,
                 isPaused = timer.isPaused,
                 updatedAtElapsedMs = timer.updatedAtElapsedMs,
@@ -654,7 +680,7 @@ class TimerForegroundService : Service() {
         TimerRuntimeState.update(
             RunningTimerState(
                 totalMillis = primary?.totalMillis ?: 0L,
-                remainingMillis = primary?.remainingMillis ?: 0L,
+                remainingMillis = primary?.let { currentRemainingMillis(it, nowElapsed) } ?: 0L,
                 isRunning = primary != null,
                 isPaused = primary?.isPaused == true,
                 laps = primary?.laps?.toList().orEmpty(),
@@ -686,6 +712,7 @@ class TimerForegroundService : Service() {
     }
 
     private fun scheduleExactWake() {
+        val nowElapsed = SystemClock.elapsedRealtime()
         val nextWakeElapsed = timers
             .asSequence()
             .filter { !it.isPaused }
@@ -694,6 +721,15 @@ class TimerForegroundService : Service() {
 
         if (nextWakeElapsed == null) {
             cancelExactWake()
+            return
+        }
+        if (nextWakeElapsed <= nowElapsed) {
+            serviceScope.launch {
+                val changed = tickTimers(CompletionTrigger.ALARM_MANAGER)
+                if (changed) persistTimers()
+                publishState()
+                syncNotifications()
+            }
             return
         }
         if (scheduledWakeElapsedMs == nextWakeElapsed) return
@@ -728,7 +764,7 @@ class TimerForegroundService : Service() {
         }
 
         scheduledWakeElapsedMs = nextWakeElapsed
-        val remainingMs = (nextWakeElapsed - SystemClock.elapsedRealtime()).coerceAtLeast(0L)
+        val remainingMs = (nextWakeElapsed - nowElapsed).coerceAtLeast(0L)
         logEvent("ALARM_SCHEDULE[$mode] in=${remainingMs}ms atElapsed=$nextWakeElapsed")
         publishState()
     }
@@ -772,6 +808,7 @@ class TimerForegroundService : Service() {
             NotificationManagerCompat.from(this).cancel(COMPLETION_NOTIFICATION_ID)
         }
         scheduleExactWake()
+        updateRunningNotificationRefreshLoop()
     }
 
     private fun ensureForegroundNotification() {
@@ -874,6 +911,8 @@ class TimerForegroundService : Service() {
 
     private fun buildRunningNotification(): Notification {
         val primary = selectSoonestTimer() ?: return buildQuickNotification()
+        val nowElapsed = SystemClock.elapsedRealtime()
+        val remainingMillis = currentRemainingMillis(primary, nowElapsed)
         val openIntent = PendingIntent.getActivity(
             this,
             2,
@@ -882,7 +921,7 @@ class TimerForegroundService : Service() {
                 .putExtra(MainActivity.EXTRA_TARGET_TIMER_ID, primary.id),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-        val remainingText = formatDurationMillis(primary.remainingMillis)
+        val remainingText = formatDurationMillisFloor(remainingMillis)
         val durationLabel = formatDuration((primary.totalMillis / 1000L).toInt())
         val contentLabel = if (primary.label.isBlank()) {
             durationLabel
@@ -890,7 +929,7 @@ class TimerForegroundService : Service() {
             "${primary.label} ($durationLabel)"
         }
         val totalMillis = primary.totalMillis.coerceAtLeast(1L)
-        val elapsedMillis = (totalMillis - primary.remainingMillis).coerceIn(0L, totalMillis)
+        val elapsedMillis = (totalMillis - remainingMillis).coerceIn(0L, totalMillis)
         val progressMax = 1000
         val progress = ((elapsedMillis * progressMax) / totalMillis).toInt()
         val expandedView = RemoteViews(packageName, R.layout.notification_running_expanded).apply {
@@ -899,7 +938,7 @@ class TimerForegroundService : Service() {
             setProgressBar(R.id.running_progress, progressMax, progress, false)
         }
 
-        return NotificationCompat.Builder(this, RUNNING_CHANNEL_ID)
+        val builder = NotificationCompat.Builder(this, RUNNING_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(openIntent)
             .setOngoing(true)
@@ -914,9 +953,6 @@ class TimerForegroundService : Service() {
             .setStyle(
                 NotificationCompat.DecoratedCustomViewStyle()
             )
-            .setWhen(0L)
-            .setShowWhen(false)
-            .setUsesChronometer(false)
             .addAction(
                 if (primary.isPaused) android.R.drawable.ic_media_play else android.R.drawable.ic_media_pause,
                 if (primary.isPaused) getString(R.string.resume) else getString(R.string.pause),
@@ -936,7 +972,25 @@ class TimerForegroundService : Service() {
                 getString(R.string.lap),
                 actionIntent(TimerServiceController.ACTION_LAP, 201, primary.id)
             )
-            .build()
+
+        builder
+            .setWhen(0L)
+            .setShowWhen(false)
+            .setUsesChronometer(false)
+        return builder.build()
+    }
+
+    private fun formatDurationMillisFloor(totalMillis: Long): String {
+        val clamped = totalMillis.coerceAtLeast(0L)
+        val totalSeconds = clamped / 1000L
+        val hours = totalSeconds / 3600
+        val minutes = (totalSeconds % 3600) / 60
+        val seconds = totalSeconds % 60
+        return if (hours > 0) {
+            String.format(java.util.Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds)
+        } else {
+            String.format(java.util.Locale.getDefault(), "%02d:%02d", minutes, seconds)
+        }
     }
 
     private fun buildCompletionNotification(): Notification {
@@ -954,7 +1008,7 @@ class TimerForegroundService : Service() {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOngoing(true)
             .setAutoCancel(false)
-            .setOnlyAlertOnce(false)
+            .setOnlyAlertOnce(true)
             .setDefaults(NotificationCompat.DEFAULT_ALL)
             .setCustomHeadsUpContentView(
                 buildCompletionHeadsUpView(
@@ -1013,20 +1067,128 @@ class TimerForegroundService : Service() {
     private fun completionExtendPendingIntent(spec: CompletedTimerSpec?): PendingIntent? {
         val activeSpec = spec ?: return null
         if (activeSpec.durationSeconds <= 0) return null
-        return startIntentForPreset(
-            activeSpec.durationSeconds,
-            activeSpec.label,
+        val intent = Intent(this, TimerForegroundService::class.java)
+            .setAction(TimerServiceController.ACTION_START)
+            .putExtra(TimerServiceController.EXTRA_DURATION_SECONDS, activeSpec.durationSeconds)
+            .putExtra(TimerServiceController.EXTRA_LABEL, activeSpec.label)
+            .putExtra(TimerServiceController.EXTRA_START_SOURCE, TimerServiceController.START_SOURCE_EXTEND)
+            .putExtra(TimerServiceController.EXTRA_SESSION_ID, activeSpec.sessionId)
+            .putExtra(TimerServiceController.EXTRA_SESSION_STARTED_AT_MS, activeSpec.sessionStartedAtEpochMs)
+            .putExtra(TimerServiceController.EXTRA_EXTENSION_COUNT, activeSpec.extensionCount)
+        return PendingIntent.getService(
+            this,
             REQUEST_CODE_COMPLETION_EXTEND,
-            TimerServiceController.START_SOURCE_EXTEND,
-            sessionId = activeSpec.sessionId,
-            sessionStartedAtEpochMs = activeSpec.sessionStartedAtEpochMs,
-            extensionCount = activeSpec.extensionCount
+            intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_ONE_SHOT
         )
     }
 
     private fun isDeviceLocked(): Boolean {
         val keyguardManager = ContextCompat.getSystemService(this, KeyguardManager::class.java)
-        return keyguardManager?.isKeyguardLocked == true
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
+            keyguardManager?.isDeviceLocked == true
+        } else {
+            keyguardManager?.isKeyguardLocked == true
+        }
+    }
+
+    private fun registerInteractiveStateReceiver() {
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_SCREEN_OFF)
+            addAction(Intent.ACTION_USER_PRESENT)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                addAction(Intent.ACTION_USER_UNLOCKED)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                addAction(PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED)
+            }
+        }
+        ContextCompat.registerReceiver(
+            this,
+            interactiveStateReceiver,
+            filter,
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+    }
+
+    private fun unregisterInteractiveStateReceiver() {
+        runCatching { unregisterReceiver(interactiveStateReceiver) }
+    }
+
+    private fun isInteractiveUpdateAllowed(): Boolean {
+        val powerManager = ContextCompat.getSystemService(this, PowerManager::class.java) ?: return false
+        return powerManager.isInteractive
+    }
+
+    private fun powerStateSummary(): String {
+        val powerManager = ContextCompat.getSystemService(this, PowerManager::class.java)
+        val interactive = powerManager?.isInteractive == true
+        val idle = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            powerManager?.isDeviceIdleMode == true
+        } else {
+            false
+        }
+        val locked = isDeviceLocked()
+        return "interactive=$interactive idle=$idle locked=$locked"
+    }
+
+    private fun shouldRunRunningNotificationRefresh(): Boolean {
+        return timers.any { !it.isPaused } &&
+            !completionAlertActive &&
+            hasNotificationPermission() &&
+            isInteractiveUpdateAllowed()
+    }
+
+    private fun restartRunningNotificationRefreshLoop() {
+        runningNotificationRefreshJob?.cancel()
+        runningNotificationRefreshJob = null
+        updateRunningNotificationRefreshLoop()
+    }
+
+    private fun updateRunningNotificationRefreshLoop() {
+        if (runningNotificationRefreshJob?.isActive == true) return
+
+        runningNotificationRefreshJob = serviceScope.launch {
+            var pausedByInteractiveState = false
+            if (shouldRunRunningNotificationRefresh()) {
+                val primary = selectSoonestTimer()
+                updateRunningNotification()
+                if (primary != null) {
+                    val remaining = currentRemainingMillis(primary, SystemClock.elapsedRealtime())
+                    logEvent("LOOP[REFRESH_LOOP] tick timerId=${primary.id} remaining=${remaining}ms")
+                }
+            }
+            while (isActive) {
+                val keepLoop =
+                    timers.any { !it.isPaused } && !completionAlertActive && hasNotificationPermission()
+                if (!keepLoop) break
+
+                val sleepMs = if (shouldRunRunningNotificationRefresh()) {
+                    if (pausedByInteractiveState) {
+                        pausedByInteractiveState = false
+                        logEvent("POWER[WAKE] refresh_resume ${powerStateSummary()}")
+                    }
+                    val primary = selectSoonestTimer()
+                    updateRunningNotification()
+                    if (primary != null) {
+                        val remaining = currentRemainingMillis(primary, SystemClock.elapsedRealtime())
+                        logEvent("LOOP[REFRESH_LOOP] tick timerId=${primary.id} remaining=${remaining}ms")
+                    }
+                    val now = SystemClock.elapsedRealtime()
+                    (1000L - (now % 1000L)).coerceAtLeast(120L)
+                } else {
+                    if (!pausedByInteractiveState) {
+                        pausedByInteractiveState = true
+                        logEvent("POWER[SLEEP] refresh_pause ${powerStateSummary()}")
+                    }
+                    5000L
+                }
+                delay(sleepMs)
+            }
+            logEvent("LOOP[REFRESH_LOOP] stop timers_running=${timers.any { !it.isPaused }} alarm=$completionAlertActive")
+            runningNotificationRefreshJob = null
+        }
     }
 
     private fun startCompletionAlert(trigger: CompletionTrigger) {

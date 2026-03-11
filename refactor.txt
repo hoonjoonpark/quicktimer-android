@@ -1,0 +1,33 @@
+목표:
+- 화면 동작은 유지한 채 Compose 관례에 맞게 파일을 분리
+- composable의 역할과 책임이 드러나도록 구조 개선
+- 재사용 가능한 UI와 화면 전용 UI를 구분
+- 과한 추상화 없이 단순하고 읽기 쉬운 구조로 정리
+- screen, content, section, dialog, item 수준의 책임이 분리되어 가독성이 좋아지도록.
+
+원칙:
+- 하나의 파일에 너무 많은 composable이 몰려 있음으면 안됨.
+- SOLID는 참고하되, 특히 SRP 관점에서 composable 책임 분리에 집중
+- 불필요한 interface / abstraction / design pattern 도입 금지
+- Compose에서는 실용적인 구조를 우선하고, 재사용 가능성이 낮은 것은 무리하게 공용화하지 말 것
+
+분리 기준:
+- Screen(엔트리)
+- Route 또는 Container(ViewModel/state/event 연결)
+- Content(순수 UI)
+- Section(화면 내 의미 단위)
+- Item/Card/Row(작은 재사용 UI)
+- Dialog/Sheet(오버레이 UI)
+- Preview(필요 시 분리)
+
+제약:
+- 기존 UI 동작 변경 금지
+- ViewModel API와 navigation 연결은 가능하면 유지
+- 상태 전달 구조는 필요한 범위 내에서만 정리
+- 파일 수를 과도하게 늘리지 말 것
+
+작업 방식:
+1. 먼저 현재 파일에서 composable들을 역할별로 분류
+2. 어떤 기준으로 파일을 나눌지 제안
+3. 최소 변경으로 리팩토링
+4. 최종 파일 구조와 각 파일의 책임을 설명
